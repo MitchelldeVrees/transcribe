@@ -29,7 +29,7 @@ export default function Home() {
   // Handle file selection
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (files && files.length > 0 && files[0].name.endsWith(".mp3")) {
+    if (files && files.length > 0 ) {
       handleFiles(files);
     }
   };
@@ -54,7 +54,7 @@ export default function Home() {
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     preventDefaults(e);
     const files = e.dataTransfer.files;
-    if (files && files.length > 0 && files[0].name.endsWith(".mp3")) {
+    if (files && files.length > 0) {
       handleFiles(files);
     }
   };
@@ -273,7 +273,7 @@ export default function Home() {
                 <input
                   type="file"
                   id="audio-upload"
-                  accept=".mp3"
+                  accept=".mp3,.wav,.m4a,.aac,.ogg,.flac"
                   className="hidden"
                   onChange={handleFileChange}
                 />
