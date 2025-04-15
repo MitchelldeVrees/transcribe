@@ -45,6 +45,7 @@ export async function POST(req: Request) {
       });
       const openaiData = await openaiResponse.json();
       
+      
       if (!openaiResponse.ok) {
         return NextResponse.json({
           error: openaiData.error ? openaiData.error.message : "OpenAI transcription failed"
