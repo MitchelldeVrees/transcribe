@@ -268,7 +268,7 @@ export default function Home() {
                   Upload MP3 bestand
                 </h3>
                 <p className="text-gray-500 mb-6">
-                  Drag &amp; drop een bestand hier of klik om op je computer te bladeren.
+                  Drag &amp; drop een beeestand hier of klik om op je computer te bladeren.
                 </p>
                 <input
                   type="file"
