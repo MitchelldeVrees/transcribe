@@ -1,6 +1,9 @@
 "use client";
 
 import React, { useState, useRef } from "react";
+import { saveAs } from "file-saver";
+import { Document, Packer, Paragraph, TextRun } from "docx";
+import { stopwords } from "./stopwords"; // adjust path as needed
 
 export default function Home() {
   // States for file data and transcription
@@ -69,6 +72,34 @@ export default function Home() {
     }
   };
 
+  const exportToWord = async () => {
+    if (!transcript) {
+      alert("Er is geen transcript beschikbaar.");
+      return;
+    }
+  
+    const doc = new Document({
+      sections: [
+        {
+          properties: {},
+          children: transcript.split("\n").map(
+            (line) => new Paragraph({
+              children: [new TextRun(line)],
+            })
+          ),
+        },
+      ],
+    });
+  
+    try {
+      const buffer = await Packer.toBlob(doc);
+      saveAs(buffer, `transcript-${new Date().toISOString()}.docx`);
+    } catch (error) {
+      console.error("Error creating document:", error);
+      alert("Fout bij het aanmaken van het Word-document.");
+    }
+  };
+
   // Transcribe button action
   const handleTranscribe = async () => {
     if (!file) return;
@@ -115,14 +146,20 @@ export default function Home() {
 
       const cleanedText = data.text.replace(/[^\w\s]/g, "").toLowerCase();
       const wordsArray = cleanedText.split(/\s+/).filter(Boolean);
+
+      // 🛑 Filter out stopwords
+      const filteredWords = wordsArray.filter((word: string) => !stopwords.includes(word));
+
       const freqMap: Record<string, number> = {};
-      wordsArray.forEach((word: string | number) => {
+      filteredWords.forEach((word: string) => {
         freqMap[word] = (freqMap[word] || 0) + 1;
       });
+
       const topWords = Object.entries(freqMap)
         .sort(([, a], [, b]) => b - a)
         .slice(0, 7)
         .map(([word, count]) => ({ word, count }));
+
       setWordFrequencies(topWords);
 
     } catch (err: any) {
@@ -268,7 +305,7 @@ export default function Home() {
                   Upload MP3 bestand
                 </h3>
                 <p className="text-gray-500 mb-6">
-                  Drag &amp; drop een beeestand hier of klik om op je computer te bladeren.
+                  Drag &amp; drop een bestand hier of klik om op je computer te bladeren.
                 </p>
                 <input
                   type="file"
@@ -425,7 +462,9 @@ export default function Home() {
 
 <div className="mb-6">
   <div className="flex justify-between items-center mb-4">
-    <h3 className="text-lg font-semibold text-gray-800">Transcript</h3>
+  <h3 className="text-lg font-semibold text-gray-800">Transcript</h3>
+
+  <div className="flex items-center">
     <button
       id="copy-btn"
       onClick={() => {
@@ -437,7 +476,15 @@ export default function Home() {
     >
       <i className="fas fa-copy mr-2"></i> Kopieer tekst
     </button>
+
+    <button
+      onClick={exportToWord}
+      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors duration-200 flex items-center ml-2"
+    >
+      <i className="fas fa-file-word mr-2"></i> Download als Word-bestand
+    </button>
   </div>
+</div>
   <div
     id="transcript-container"
     className="bg-gray-50 border border-gray-200 rounded-lg p-4 max-h-96 overflow-y-auto text-gray-800"
