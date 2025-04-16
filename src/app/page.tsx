@@ -20,6 +20,11 @@ export default function Home() {
   const [processingTime, setProcessingTime] = useState(0);
   const [summary, setSummary] = useState("");
   const [wordFrequencies, setWordFrequencies] = useState<{ word: string; count: number }[]>([]);
+  const [actionItems, setActionItems] = useState("");
+  const [qna, setQna] = useState("");
+  // At the top with your other states
+  const [speakersTranscript, setSpeakersTranscript] = useState("");
+
 
   // New state: transcription model choice ("assembly" or "openai")
   const [model, setModel] = useState<"assembly" | "openai">("assembly");
@@ -107,23 +112,20 @@ export default function Home() {
     setStage("loading");
     setProgress(0);
     const startTime = Date.now();
-
-    // Simulate progress bar animation
+  
     let simulatedProgress = 0;
     const progressInterval = setInterval(() => {
       simulatedProgress += Math.random() * 5;
       if (simulatedProgress > 95) simulatedProgress = 95;
       setProgress(simulatedProgress);
     }, 300);
-
+  
     try {
       const formData = new FormData();
       formData.append("audioFile", file);
-      // Append the selected transcription model and summarization flag
       formData.append("transcriptionModel", model);
       formData.append("enableSummarization", summarization ? "true" : "false");
-
-      // Ensure the endpoint matches your API route location
+  
       const response = await fetch("/api/transcribe", {
         method: "POST",
         body: formData,
@@ -134,34 +136,43 @@ export default function Home() {
       }
       const data = await response.json();
       setTranscript(data.text);
+      
+      // Save speaker transcript if available
+      if (data.speakers) {
+        setSpeakersTranscript(data.speakers);
+      } else {
+        setSpeakersTranscript("");
+      }
+      
       if (data.summary) {
         setSummary(data.summary);
+        if (data.actionItems) {
+          setActionItems(data.actionItems);
+        }
+        if (data.qna) {
+          setQna(data.qna);
+        }
       }
-      // Calculate word count from transcript
+      
       const words = data.text.split(/\s+/).filter((w: string) => w.length > 0);
       setWordCount(words.length);
-
+  
       const elapsed = Math.floor((Date.now() - startTime) / 1000);
       setProcessingTime(elapsed);
-
+  
       const cleanedText = data.text.replace(/[^\w\s]/g, "").toLowerCase();
       const wordsArray = cleanedText.split(/\s+/).filter(Boolean);
-
-      // 🛑 Filter out stopwords
       const filteredWords = wordsArray.filter((word: string) => !stopwords.includes(word));
-
       const freqMap: Record<string, number> = {};
       filteredWords.forEach((word: string) => {
         freqMap[word] = (freqMap[word] || 0) + 1;
       });
-
       const topWords = Object.entries(freqMap)
         .sort(([, a], [, b]) => b - a)
         .slice(0, 7)
         .map(([word, count]) => ({ word, count }));
-
       setWordFrequencies(topWords);
-
+  
     } catch (err: any) {
       setError(err.message);
       setStage("upload");
@@ -174,7 +185,9 @@ export default function Home() {
       setStage("results");
     }, 500);
   };
+  
 
+  
   // Reset to start a new transcription
   const handleNewTranscription = () => {
     setFile(null);
@@ -527,6 +540,55 @@ export default function Home() {
               {line}
             </div>
           )
+      )}
+    </div>
+  </div>
+)}
+{speakersTranscript && (
+  <div className="mb-6">
+    <div className="flex justify-between items-center mb-4">
+      <h3 className="text-lg font-semibold text-gray-800">Sprekers Transcript</h3>
+      <button
+        onClick={() => {
+          navigator.clipboard.writeText(speakersTranscript);
+        }}
+        className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors duration-200 flex items-center"
+      >
+        <i className="fas fa-copy mr-2"></i> Kopieer sprekers transcript
+      </button>
+    </div>
+    <div
+      id="speakers-container"
+      className="bg-gray-50 border border-gray-200 rounded-lg p-4 max-h-96 overflow-y-auto text-gray-800 whitespace-pre-wrap"
+    >
+      {speakersTranscript}
+    </div>
+  </div>
+)}
+
+{actionItems && (
+  <div className="mb-6">
+    <div className="flex justify-between items-center mb-4">
+      <h3 className="text-lg font-semibold text-gray-800">Actiepunten & Taken</h3>
+      <button
+        onClick={() => {
+          navigator.clipboard.writeText(actionItems);
+        }}
+        className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors duration-200 flex items-center"
+      >
+        <i className="fas fa-copy mr-2"></i> Kopieer actiepunten
+      </button>
+    </div>
+    <div
+      id="action-items-container"
+      className="bg-gray-50 border border-gray-200 rounded-lg p-4 max-h-96 overflow-y-auto text-gray-800"
+    >
+      {actionItems.split("\n").map((line, idx) =>
+        line.trim() ? (
+          <div key={idx} className="action-item-line mb-3 p-2 rounded-lg">
+            {line}
+          </div>
+        ) : null
       )}
     </div>
   </div>
