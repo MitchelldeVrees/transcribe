@@ -38,10 +38,12 @@
     "typescript": "5.8.2",
     "wrangler": "4.7.0"
   },
-  "scripts": {
+"scripts": {
   "build": "open-next build",
+  "deploy": "npm run build && wrangler deploy",
   "dev": "next dev",
-  "deploy": "wrangler deploy",
   "preview": "open-next build && wrangler dev"
 }
+
 }
+
