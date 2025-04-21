@@ -4,6 +4,11 @@
   "compatibility_date": "2025-04-01",
   "compatibility_flags": ["nodejs_compat"],
   "minify": true,
+
+  "zone_id": "YOUR_ZONE_ID_HERE",
+  "workers_dev": false,
+  "routes": ["www.luisterslim.nl/*", "luisterslim.nl/*"],
+
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS"
