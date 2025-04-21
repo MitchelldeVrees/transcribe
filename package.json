@@ -42,10 +42,12 @@
   },
   
     "scripts": {
-      "build": "next build",
-      "cf-build": "opennextjs-cloudflare build",
-      "cf-deploy": "opennextjs-cloudflare deploy"
-    }
+    "dev": "next dev",
+    "build": "next build",
+    "cf-build": "opennextjs-cloudflare build",
+    "cf-deploy": "opennextjs-cloudflare deploy",
+    "deploy": "npm run cf-build && npm run cf-deploy"
+  }
   
   
 }
