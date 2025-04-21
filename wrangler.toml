@@ -2,12 +2,18 @@ name = "transcribe"
 main = ".open-next/worker.js"
 compatibility_date = "2025-04-01"
 compatibility_flags = ["nodejs_compat"]
+workers_dev = false
+zone_id = "7ce83452d7e1003fd3bfa54d6073da75"
+routes = ["www.luisterslim.nl/*", "luisterslim.nl/*"]
 minify = true
+upload_source_maps = true
 
-# remove the [site] block entirely
+[assets]
+  bucket  = ".open-next/assets"
+  binding = "ASSETS"
 
-assets = { directory = ".open-next/assets", binding = "ASSETS" }
+[observability]
+  enabled = true
 
-[build]
-command = "npm run build:open-next"
-upload = { format = "modules" }
+[[plugins]]
+  package = "@opennextjs/cloudflare"
