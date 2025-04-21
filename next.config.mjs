@@ -9,4 +9,5 @@ const nextConfig = {
   assetPrefix: isProd ? '/' : '',
 };
 
+
 export default nextConfig;
