@@ -11,8 +11,8 @@ minify = true
 upload_source_maps = true
 
 [assets]
-  bucket  = ".open-next/assets"
-  binding = "ASSETS"
+  directory = ".open-next/assets"
+  binding   = "ASSETS"
 
 [observability]
   enabled = true
