@@ -5,7 +5,7 @@
   "compatibility_flags": ["nodejs_compat"],
   "minify": true,
 
-  "zone_id": "YOUR_ZONE_ID_HERE",
+  "zone_id": "7ce83452d7e1003fd3bfa54d6073da75",
   "workers_dev": false,
   "routes": ["www.luisterslim.nl/*", "luisterslim.nl/*"],
 
