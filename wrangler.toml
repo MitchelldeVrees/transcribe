@@ -1,8 +1,12 @@
-name = "transcribe"
-main = ".open-next/worker.js"
-compatibility_date = "2025-04-01"
-compatibility_flags = ["nodejs_compat"]
-minify = true
+# wrangler.toml :contentReference[oaicite:0]{index=0}&#8203;:contentReference[oaicite:1]{index=1}
+ name = "transcribe"
+ main = ".open-next/worker.js"
+ compatibility_date = "2025-04-01"
+ compatibility_flags = ["nodejs_compat"]
+ minify = true
 
-[site]
-bucket = ".open-next/assets"
+ [site]
+ bucket = ".open-next/assets"
+
+ [build]
+ command = "npm run build"
