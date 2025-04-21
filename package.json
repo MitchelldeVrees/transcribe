@@ -41,9 +41,9 @@
 "scripts": {
   "build": "next build",
   "build:open-next": "open-next build",
-  "deploy": "npm run build && wrangler deploy",
   "dev": "next dev",
-  "preview": "open-next build && wrangler dev"
+  "preview": "open-next build && wrangler dev",
+  "deploy": "npm run build:open-next && wrangler deploy"
 }
 
 }
