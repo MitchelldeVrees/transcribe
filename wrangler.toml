@@ -9,4 +9,4 @@
  bucket = ".open-next/assets"
 
  [build]
- command = "npm run build"
+ command = "npm run build:open-next"
