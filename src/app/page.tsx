@@ -259,7 +259,7 @@ export default function Home() {
             Audio Transcriber
           </h1>
           <p className="text-gray-600">
-            Upload een MP3 file
+          Upload een mp3, mp4, mpeg, mpga, m4a, wav of webm bestand
           </p>
         </div>
   {/* Transcription Model Dropdown */}
@@ -285,6 +285,7 @@ export default function Home() {
       <option value="openai">V2</option>
     </select>
   </div>
+  <input type="hidden" name="debug" value="true" />
 
   {/* Summarization Toggle */}
   <div className="flex items-center gap-3">
@@ -315,7 +316,7 @@ export default function Home() {
               <div className="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-lg p-12 bg-gray-50 hover:bg-gray-100 transition-colors duration-200">
                 <i className="fas fa-file-audio text-5xl text-blue-500 mb-4"></i>
                 <h3 className="text-xl font-semibold text-gray-700 mb-2">
-                  Upload MP3 bestand
+                  Upload een mp3, mp4, mpeg, mpga, m4a, wav of webm bestand
                 </h3>
                 <p className="text-gray-500 mb-6">
                   Drag &amp; drop een bestand hier of klik om op je computer te bladeren.
@@ -323,7 +324,7 @@ export default function Home() {
                 <input
                   type="file"
                   id="audio-upload"
-                  accept=".mp3,.wav,.m4a,.aac,.ogg,.flac"
+                  accept=".mp3,.mp4,.mpeg,.mpga,.m4a,.wav,.webm"
                   className="hidden"
                   onChange={handleFileChange}
                 />
