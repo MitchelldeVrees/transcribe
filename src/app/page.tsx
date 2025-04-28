@@ -22,6 +22,7 @@ export default function Home() {
   const [wordFrequencies, setWordFrequencies] = useState<{ word: string; count: number }[]>([]);
   const [actionItems, setActionItems] = useState("");
   const [qna, setQna] = useState("");
+  const [estimatedSec, setEstimatedSec] = useState(0);
   // At the top with your other states
   const [speakersTranscript, setSpeakersTranscript] = useState("");
 
@@ -48,6 +49,20 @@ export default function Home() {
     setFile(selectedFile);
     setFileName(selectedFile.name);
     const sizeMB = (selectedFile.size / (1024 * 1024)).toFixed(2);
+    // in handleTranscribe, before setStage("loading"):
+// file.size is in bytes
+    const sizeMBNoRound = selectedFile.size / (1024 * 1024);
+
+    if (sizeMBNoRound < 10) {
+      setEstimatedSec(20);    // small files: ~20s
+    } else if (sizeMBNoRound < 50) {
+      setEstimatedSec(45);    // medium: ~45s
+    } else if (sizeMBNoRound < 100) {
+      setEstimatedSec(90);    // large: ~90s
+    } else {
+      setEstimatedSec(120);   // very large: ~2m
+    }
+
     setFileSizeMB(sizeMB);
     const url = URL.createObjectURL(selectedFile);
     setAudioUrl(url);
@@ -107,18 +122,20 @@ export default function Home() {
 
   // Transcribe button action
   const handleTranscribe = async () => {
+
+
     if (!file) return;
     setError("");
     setStage("loading");
     setProgress(0);
     const startTime = Date.now();
-  
-    let simulatedProgress = 0;
     const progressInterval = setInterval(() => {
-      simulatedProgress += Math.random() * 5;
-      if (simulatedProgress > 95) simulatedProgress = 95;
-      setProgress(simulatedProgress);
-    }, 300);
+    const elapsedSec = (Date.now() - startTime) / 1000;
+      // cap at 95% so you leave room for the final API call
+    const pct = Math.min(95, (elapsedSec / estimatedSec) * 100);
+    setProgress(pct);
+    }, 200);
+
   
     try {
       const formData = new FormData();
@@ -181,9 +198,7 @@ export default function Home() {
     }
     clearInterval(progressInterval);
     setProgress(100);
-    setTimeout(() => {
-      setStage("results");
-    }, 500);
+    setTimeout(() => setStage("results"), 300);
   };
   
 
