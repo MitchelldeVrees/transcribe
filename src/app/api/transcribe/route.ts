@@ -1,168 +1,179 @@
-import { NextResponse } from 'next/server';
-import fs from 'fs/promises';
-import os from 'os';
-import path from 'path';
-import ffmpeg from 'fluent-ffmpeg';
-import { promisify } from 'util';
-import { v4 as uuidv4 } from 'uuid';
-import fetch from 'node-fetch';
-import pLimit from 'p-limit';
+import { NextRequest, NextResponse } from 'next/server';
 
-// Use Node.js runtime
-export const runtime = 'nodejs';
+// Edge runtime for Cloudflare Workers
+export const runtime = 'edge';
 
-// Limits
-const MAX_BYTES = 25 * 1024 * 1024;   // 25 MB per chunk
-const MAX_SECONDS = 10 * 60;          // 10 minutes per chunk
-const ffprobe = promisify(ffmpeg.ffprobe);
-const limit = pLimit(3);
+// Ensure API key is set
+if (!process.env.OPENAI_API_KEY) {
+  throw new Error(
+    'OpenAI API key ontbreekt. Stel de OPENAI_API_KEY omgevingsvariabele in.'
+  );
+}
 
-// Split and re-encode into WAV chunks
-async function splitIntoChunks(inputPath: string, outDir: string): Promise<string[]> {
-  const { size } = await fs.stat(inputPath);
-  const meta: any = await ffprobe(inputPath);
-  const duration = meta.format.duration;
-  const bytesPerSec = size / duration;
-  const sizeLimitSec = Math.floor((MAX_BYTES * 0.9) / bytesPerSec);
-  const segmentSec = Math.min(MAX_SECONDS, Math.max(1, sizeLimitSec));
+/**
+ * Transcribe a single audio chunk via OpenAI Audio API
+ */
+async function transcribeAudio(file: File): Promise<string> {
+  // 1) Zet de incoming File om in een ArrayBuffer
+  const buffer = await file.arrayBuffer();
+  // 2) Maak er een Blob van met de juiste MIME-type
+  const blob = new Blob([buffer], { type: file.type });
+  
+  const form = new FormData();
+  // 3) Voeg nu wél een echte Blob toe
+  form.append("file", blob, file.name);
+  form.append("model", "gpt-4o-mini-transcribe");
+  form.append("language", "nl");
 
-  await fs.mkdir(outDir, { recursive: true });
-  const pattern = path.join(outDir, 'chunk_%03d.wav');
-  await new Promise<void>((resolve, reject) => {
-    ffmpeg(inputPath)
-      .outputOptions([
-        '-f', 'segment',
-        '-segment_time', `${segmentSec}`,
-        '-reset_timestamps', '1',
-        '-c:a', 'pcm_s16le',
-        '-ar', '16000',
-        '-ac', '1',
-      ])
-      .output(pattern)
-      .on('end', () => resolve())
-      .on('error', reject)
-      .run();
+  const res = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+    },
+    body: form as any,
+    cache: 'no-store',              
   });
 
-  const files = await fs.readdir(outDir);
-  return files
-    .filter(f => f.startsWith('chunk_'))
-    .map(f => path.join(outDir, f));
-}
-
-// Transcribe a single chunk via OpenAI API
-async function transcribeChunk(chunkPath: string): Promise<string> {
-  try {
-    const buffer = await fs.readFile(chunkPath);
-    const FormData = (await import('form-data')).default;
-    const form = new FormData();
-    form.append('file', buffer, path.basename(chunkPath));
-    form.append('model', 'gpt-4o-mini-transcribe');
-    form.append('language', 'nl');
-
-    const res = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
-      body: form as any,
-    });
-    const json = await res.json();
-    if (!res.ok) throw new Error('Transcription failed');
-    return (json.text || '').trim();
-  } catch (err) {
-    console.error('Transcription error for', chunkPath, err);
-    throw new Error('Fout bij transcriberen');
+  if (!res.ok) {
+    const errorText = await res.text();
+    console.error('Transcription error:', errorText);
+    throw new Error('Transcription mislukt voor een chunk: ' + errorText);
   }
+
+  const json = await res.json();
+  return (json.text || '').trim();
 }
 
-// Summarize transcript
-async function summarizeTranscript(fullText: string): Promise<{ summary: string; actionItems: string; qna: string }> {
-  try {
-    const prompt = `Hier is een samenvatting van het transcript in drie delen:
-1. **Samenvatting** -
-2. **Actiepunten** -
-3. **Vragen & Antwoorden** -
+/**
+ * Summarize the full transcript via function calling
+ */
+async function summarizeTranscript(fullText: string): Promise<{
+  summary: string;
+  actionItems: string;
+  qna: string;
+}> {
 
-Transcript:
-${fullText}`;
-    const res = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+  const payload = {
+    model: "gpt-4o-mini",
+    messages: [
+      {
+        role: "system",
+        content: "Je bent een transcript-samenvatter die alleen JSON retourneert.",
       },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          { role: 'system', content: 'Je bent een transcript-samenvatter.' },
-          { role: 'user', content: prompt }
-        ],
-        temperature: 0.5,
-      }),
-    });
-    const json = await res.json();
-    if (!res.ok) throw new Error('Summarization failed');
+      {
+        role: "user",
+        content: `
+          Vat dit transcript samen in JSON met de volgende keys:
+          {
+            "summary": string,
+            "actionItems": string,
+            "qna": string
+          }
+          Transcript:
+          ${fullText}
+        `,
+      },
+    ],
+    temperature: 0.4,
+  };
+  
+  console.log(payload);
 
-    const text = json.choices[0].message.content;
-    const regex = /1\. \*\*Samenvatting\*\*[\s\S]*?-(?:\s*)([\s\S]*?)2\. \*\*Actiepunten\*\*[\s\S]*?-(?:\s*)([\s\S]*?)3\. \*\*Vragen & Antwoorden\*\*[\s\S]*?-(?:\s*)([\s\S]*)/;
-    const match = text.match(regex);
-    if (!match) return { summary: text.trim(), actionItems: '', qna: '' };
+  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+    },
+    body: JSON.stringify(payload),
+  });
 
-    return {
-      summary: match[1].trim(),
-      actionItems: match[2].trim(),
-      qna: match[3].trim(),
-    };
+  if (!res.ok) {
+    const err = await res.text();
+    console.error('Summarization error:', err);
+    throw new Error('Samenvatten mislukt: ' + err);
+  }
+
+  const json = await res.json();
+  const message = json.choices[0].message;
+let data;
+
+if (message.function_call) {
+  // parse de arguments zoals je al had
+  const args = message.function_call.arguments;
+  data = typeof args === 'string' ? JSON.parse(args) : args;
+} else {
+  // fallback: strip eerst ```json … ```
+  let content = message.content.trim();
+
+  // regex: verwijder ```json\n aan het begin en ``` aan het eind
+  content = content
+    .replace(/^```(?:json)?\s*/, '')   // verwijder opening fence
+    .replace(/```$/, '');              // verwijder sluitende fence
+
+  try {
+    data = JSON.parse(content);
   } catch (err) {
-    console.error('Summarization error', err);
-    throw new Error('Fout bij samenvatten');
+    throw new Error("Kon zelfs na strippen niet parsen:\n" + content);
   }
 }
 
-// POST handler without saving audio files
-export async function POST(request: Request) {
-  const session = uuidv4();
-  const tmpDir = path.join(os.tmpdir(), session);
 
+  return {
+    summary: data.summary || '',
+    actionItems: data.actionItems || '',
+    qna: data.qna || '',
+  };
+}
+
+export async function POST(request: NextRequest) {
   try {
+    
     const formData = await request.formData();
-    const file = formData.get('audioFile') as File | null;
-    if (!file) {
-      return NextResponse.json({ error: 'Geen audioFile gevonden' }, { status: 400 });
+    // Collect all uploaded chunks
+    const rawFiles = formData.getAll('audioFile');
+    const chunks: File[] = rawFiles.filter((f) => f instanceof File) as File[];
+
+    if (chunks.length === 0) {
+      return NextResponse.json(
+        { error: 'Geen audioFile chunk(s) gevonden' },
+        { status: 400 }
+      );
     }
 
-    // write to temp for splitting
-    await fs.mkdir(tmpDir, { recursive: true });
-    const origPath = path.join(tmpDir, file.name);
-    await fs.writeFile(origPath, Buffer.from(await file.arrayBuffer()));
+    // Sequentially transcribe each chunk
+    const transcripts: string[] = [];
+    for (const chunk of chunks) {
+      const text = await transcribeAudio(chunk);
+      console.log(text);
+      transcripts.push(text);
+    }
 
-    // split into chunks
-    const chunkFiles = await splitIntoChunks(origPath, tmpDir);
+    // Combine all transcripts
+    const fullText = transcripts.join('\n').trim();
 
-    // transcribe each chunk
-    const texts = await Promise.all(chunkFiles.map(cp => limit(() => transcribeChunk(cp))));
-    const fullText = texts.join('\n').trim();
+    // Optionally summarize combined transcript
+    let summary = '';
+    let actionItems = '';
+    let qna = '';
+    console.log('Samenvatten:', formData.get('enableSummarization')); 
 
-    // optional summarization
-    let summary = '', actionItems = '', qna = '';
     if (formData.get('enableSummarization') === 'true') {
+      console.log("Generat  ing summary...");
       const parsed = await summarizeTranscript(fullText);
+      console.log(parsed)
       summary = parsed.summary;
       actionItems = parsed.actionItems;
       qna = parsed.qna;
+
     }
 
-    // cleanup temp
-    await fs.rm(tmpDir, { recursive: true, force: true });
-
-    // return only transcript and summary parts
     return NextResponse.json({ text: fullText, summary, actionItems, qna });
   } catch (err: any) {
-    console.error('Error in POST /api/transcribe', err);
+    console.error('Error in Edge function /api/transcribe:', err);
     return NextResponse.json(
-      { error: 'Er is een interne fout opgetreden. Probeer het later opnieuw.' },
+      { error: err.message || 'Er is een interne fout opgetreden.' },
       { status: 500 }
     );
   }
 }
-
-
