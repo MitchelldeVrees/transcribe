@@ -68,7 +68,11 @@ export async function splitAudioFile(
   const chunks: File[] = await Promise.all(
     chunkFiles.map(async (name) => {
       const data = (await ffmpeg.readFile(name.name, "binary")) as Uint8Array;
-      return new File([data.buffer], name.name, { type: "audio/mpeg" });
+      return new File(
+        [ data ],            // Uint8Array is allowed directly
+        name.name,
+        { type: "audio/mpeg" }
+      );      
     })
   );
 

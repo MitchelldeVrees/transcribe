@@ -55,8 +55,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "cf-build": "opennextjs-cloudflare build",
-    "cf-deploy": "opennextjs-cloudflare deploy",
+    "cf-build": "npx @opennextjs-cloudflare build",
+    "cf-deploy": "npx @opennextjs-cloudflare deploy",
     "deploy": "npm run cf-build && npm run cf-deploy"
   }
 }

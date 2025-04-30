@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 // Edge runtime for Cloudflare Workers
-export const runtime = 'edge';
+export const runtime = 'nodejs';
 
 // Ensure API key is set
 if (!process.env.OPENAI_API_KEY) {
