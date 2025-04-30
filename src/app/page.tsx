@@ -1,9 +1,17 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { saveAs } from "file-saver";
 import { Document, Packer, Paragraph, TextRun } from "docx";
 import { stopwords } from "./stopwords"; // adjust path as needed
+import { loadFFmpeg, splitAudioFile } from "../lib/ffmpegHelper";
+
+interface TranscribeResponse {
+  text: string;
+  summary?: string;
+  actionItems?: string;
+  qna?: string;
+}
 
 export default function Home() {
   // States for file data and transcription
@@ -25,7 +33,10 @@ export default function Home() {
   const [estimatedSec, setEstimatedSec] = useState(0);
   // At the top with your other states
   const [speakersTranscript, setSpeakersTranscript] = useState("");
+  const [ready, setReady] = useState(false);
 
+
+  const [ffmpegLoaded, setFfmpegLoaded] = useState(false);
 
   // New state: transcription model choice ("assembly" or "openai")
   const [model, setModel] = useState<"assembly" | "openai">("assembly");
@@ -42,6 +53,13 @@ export default function Home() {
       handleFiles(files);
     }
   };
+
+  useEffect(() => {
+    (async () => {
+      await loadFFmpeg();
+      setReady(true);
+    })();
+  }, []);
 
   // Process selected file
   const handleFiles = (files: FileList) => {
@@ -121,88 +139,81 @@ export default function Home() {
   };
 
   // Transcribe button action
-  const handleTranscribe = async () => {
-
-
+  async function handleTranscribe() {
     if (!file) return;
-    setError("");
     setStage("loading");
+    setError("");
     setProgress(0);
-    const startTime = Date.now();
-    const progressInterval = setInterval(() => {
-    const elapsedSec = (Date.now() - startTime) / 1000;
-      // cap at 95% so you leave room for the final API call
-    const pct = Math.min(95, (elapsedSec / estimatedSec) * 100);
-    setProgress(pct);
-    }, 200);
-
+  
+    const startTime = performance.now();
   
     try {
-      const formData = new FormData();
-      formData.append("audioFile", file);
-      formData.append("transcriptionModel", model);
-      formData.append("enableSummarization", summarization ? "true" : "false");
+      // 1) Split audio en chunk-files
+      const chunks = await splitAudioFile(file, 20 * 60);
+      setProgress(50);
+  
+      // 2) FormData & API-call
+      const form = new FormData();
+      chunks.forEach((chunk) => form.append("audioFile", chunk));
+      form.append("enableSummarization", summarization ? "true" : "false");
   
       const response = await fetch("/api/transcribe", {
         method: "POST",
-        body: formData,
+        body: form,
       });
+      setProgress(90);
+  
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Transcription failed");
+        const err = await response.json();
+        throw new Error(err.error || "Transcription failed");
       }
-      const data = await response.json();
+  
+      // 3) Typen van de JSON-response
+      const data = (await response.json()) as TranscribeResponse;
+  
+      // 4) Zet transcript en samenvatting
       setTranscript(data.text);
-      
-      // Save speaker transcript if available
-      if (data.speakers) {
-        setSpeakersTranscript(data.speakers);
-      } else {
-        setSpeakersTranscript("");
-      }
-      
-      if (data.summary) {
-        setSummary(data.summary);
-        if (data.actionItems) {
-          setActionItems(data.actionItems);
-        }
-        if (data.qna) {
-          setQna(data.qna);
-        }
-      }
-      
-      const words = data.text.split(/\s+/).filter((w: string) => w.length > 0);
-      setWordCount(words.length);
+      setSummary(data.summary ?? "");
+      setActionItems(data.actionItems ?? "");
+      setQna(data.qna ?? "");
   
-      const elapsed = Math.floor((Date.now() - startTime) / 1000);
-      setProcessingTime(elapsed);
+      // 5) Meet en zet verwerkingstijd
+      setProcessingTime(
+        Math.round((performance.now() - startTime) / 1000)
+      );
   
-      const cleanedText = data.text.replace(/[^\w\s]/g, "").toLowerCase();
-      const wordsArray = cleanedText.split(/\s+/).filter(Boolean);
-      const filteredWords = wordsArray.filter((word: string) => !stopwords.includes(word));
+      // 6) Bereken woordfrequenties
+      // 6a) Vind alle woorden (geen cijfers/punctie) of lege array
+      const matches = data.text
+        .toLowerCase()
+        .match(/\b[^\d\W]+\b/g) || [];
+  
+      // 6b) Filter stopwoorden
+      const filtered = matches.filter((w: string) => !stopwords.includes(w));
+  
+      // 6c) Tel per woord
       const freqMap: Record<string, number> = {};
-      filteredWords.forEach((word: string) => {
+      filtered.forEach((word: string | number) => {
         freqMap[word] = (freqMap[word] || 0) + 1;
       });
-      const topWords = Object.entries(freqMap)
-        .sort(([, a], [, b]) => b - a)
-        .slice(0, 7)
-        .map(([word, count]) => ({ word, count }));
-      setWordFrequencies(topWords);
   
+      // 6d) Maak er een array van en sorteer op aflopend
+      const freqArray = Object.entries(freqMap)
+        .map(([word, count]) => ({ word, count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 20); // top 20
+  
+      setWordFrequencies(freqArray);
+  
+      // 7) Toon de resultaten
+      setStage("results");
     } catch (err: any) {
+      console.error(err);
       setError(err.message);
       setStage("upload");
-      clearInterval(progressInterval);
-      return;
     }
-    clearInterval(progressInterval);
-    setProgress(100);
-    setTimeout(() => setStage("results"), 300);
-  };
-  
-
-  
+  }
+ 
   // Reset to start a new transcription
   const handleNewTranscription = () => {
     setFile(null);
