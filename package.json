@@ -36,7 +36,7 @@
     "uuid": "^11.1.0"
   },
   "devDependencies": {
-    "@opennextjs/cloudflare": "^0.2.1",
+    "@opennextjs/cloudflare": "^1.0.0-beta.3",
     "@tailwindcss/postcss": "^4.1.4",
     "@types/archiver": "^6.0.3",
     "@types/file-saver": "^2.0.7",
