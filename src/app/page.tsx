@@ -15,6 +15,8 @@ interface TranscribeResponse {
 
 export default function Home() {
   // States for file data and transcription
+  const progressInterval = useRef<NodeJS.Timeout>();
+
   const [file, setFile] = useState<File | null>(null);
   const [fileName, setFileName] = useState("");
   const [audioUrl, setAudioUrl] = useState("");
@@ -55,6 +57,32 @@ export default function Home() {
   };
 
   useEffect(() => {
+    // whenever we enter "loading", start fresh
+    if (stage === "loading") {
+      setProgress(0);
+      const startTime = Date.now();
+  
+      progressInterval.current = setInterval(() => {
+        const elapsedSec = (Date.now() - startTime) / 1000;
+        const pct = Math.min((elapsedSec / estimatedSec) * 100, 100);
+        setProgress(pct);
+        // optionally stop just shy of 100 so UI jump is smoother:
+        // if (pct >= 99) clearInterval(progressInterval.current!);
+        if (pct >= 100) {
+          clearInterval(progressInterval.current!);
+        }
+      }, 100); // update 10×/sec for smoothness
+    }
+  
+    // cleanup on unmount or whenever stage changes away from "loading"
+    return () => {
+      if (progressInterval.current) {
+        clearInterval(progressInterval.current);
+      }
+    };
+  }, [stage, estimatedSec]);
+
+  useEffect(() => {
     (async () => {
       await loadFFmpeg();
       setReady(true);
@@ -76,9 +104,9 @@ export default function Home() {
     } else if (sizeMBNoRound < 50) {
       setEstimatedSec(45);    // medium: ~45s
     } else if (sizeMBNoRound < 100) {
-      setEstimatedSec(90);    // large: ~90s
+      setEstimatedSec(110);    // large: ~90s
     } else {
-      setEstimatedSec(120);   // very large: ~2m
+      setEstimatedSec(140);   // very large: ~2m
     }
 
     setFileSizeMB(sizeMB);
@@ -150,7 +178,6 @@ export default function Home() {
     try {
       // 1) Split audio en chunk-files
       const chunks = await splitAudioFile(file, 20 * 60);
-      setProgress(50);
   
       // 2) FormData & API-call
       const form = new FormData();
@@ -161,7 +188,6 @@ export default function Home() {
         method: "POST",
         body: form,
       });
-      setProgress(90);
   
       if (!response.ok) {
         const err = await response.json();
@@ -181,6 +207,8 @@ export default function Home() {
       setProcessingTime(
         Math.round((performance.now() - startTime) / 1000)
       );
+
+      setWordCount(data.text.split(/\s+/).length);
   
       // 6) Bereken woordfrequenties
       // 6a) Vind alle woorden (geen cijfers/punctie) of lege array
@@ -214,6 +242,7 @@ export default function Home() {
     }
   }
  
+  
   // Reset to start a new transcription
   const handleNewTranscription = () => {
     setFile(null);
@@ -229,6 +258,7 @@ export default function Home() {
     setStage("upload");
   };
 
+  
   return (
     <div className="bg-gray-50 min-h-screen">
       {/* Inline CSS styles for waveform and visualizer */}

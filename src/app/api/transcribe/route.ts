@@ -63,7 +63,7 @@ async function summarizeTranscript(fullText: string): Promise<{
       {
         role: "user",
         content: `
-          Vat dit transcript samen in JSON met de volgende keys:
+          Ik heb een transcript voor jou in het Nederlands. Er kunnen spelfouten in de transcriptie zitten. Verbeter dit en maak dan een samenvatting. De samenvatting hoeft niet beknopt dus mag zeker uitgebreid zijn maar er hoeft ook geen onnodige informatie in te zitten. Daarnaast wil ik ook een aparte kop voor actiepunten die benoemd zijn in het transcript. En ik wil alle vragen die gesteld zijn en de daarbij behorende antwoorden in een aparte kop genaamd qna. Geef de output in JSON met de volgende keys:
           {
             "summary": string,
             "actionItems": string,
@@ -74,7 +74,7 @@ async function summarizeTranscript(fullText: string): Promise<{
         `,
       },
     ],
-    temperature: 0.4,
+    temperature: 0.5,
   };
   
   console.log(payload);
