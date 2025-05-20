@@ -13,17 +13,27 @@ if (!process.env.OPENAI_API_KEY) {
 /**
  * Transcribe a single audio chunk via OpenAI Audio API
  */
-async function transcribeAudio(file: File): Promise<string> {
-  // 1) Zet de incoming File om in een ArrayBuffer
+/**
+ * Transcribe a single chunk, met optionele taalhint
+ */
+async function transcribeAudio(file: File, language?: string): Promise<string> {
   const buffer = await file.arrayBuffer();
-  // 2) Maak er een Blob van met de juiste MIME-type
   const blob = new Blob([buffer], { type: file.type });
-  
+
   const form = new FormData();
-  // 3) Voeg nu wél een echte Blob toe
   form.append("file", blob, file.name);
   form.append("model", "gpt-4o-mini-transcribe");
-  form.append("language", "nl");
+
+  // Alleen toevoegen als we al een taal weten
+  if (language) {
+    if (language === 'netherlands') {
+      language = 'nl';
+    }
+    if (language === 'english') {
+      language = 'en';
+    }
+    form.append("language", language);
+  }
 
   const res = await fetch('https://api.openai.com/v1/audio/transcriptions', {
     method: 'POST',
@@ -31,7 +41,7 @@ async function transcribeAudio(file: File): Promise<string> {
       Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
     },
     body: form as any,
-    cache: 'no-store',              
+    cache: 'no-store',
   });
 
   if (!res.ok) {
@@ -43,6 +53,47 @@ async function transcribeAudio(file: File): Promise<string> {
   const json = await res.json();
   return (json.text || '').trim();
 }
+
+
+/**
+ * Detecteert de taal van één audio-chunk
+ */
+/**
+ * Detecteert de taal van één audio-chunk via whisper-1
+ */
+async function detectLanguage(file: File, maxBytes = 5 * 1024 * 1024): Promise<string> {
+  // Snijd een sample af (max 5 MB of minder als de file kleiner is)
+  const sample = file.slice(0, Math.min(file.size, maxBytes), file.type);
+
+  const buffer = await sample.arrayBuffer();
+  const blob = new Blob([buffer], { type: file.type });
+
+  const form = new FormData();
+  form.append("file", blob, file.name);
+  form.append("model", "whisper-1");
+  form.append("response_format", "verbose_json");
+
+  const res = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+    },
+    body: form as any,
+    cache: 'no-store',
+  });
+
+  if (!res.ok) {
+    const errorText = await res.text();
+    console.error('Language detection error:', errorText);
+    throw new Error('Taal detectie mislukt: ' + errorText);
+  }
+
+  const json = await res.json();
+  return json.language; // b.v. "nl" of "en"
+}
+
+
+
 
 /**
  * Summarize the full transcript via function calling
@@ -141,15 +192,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const detectedLang = await detectLanguage(chunks[0]);
+    console.log('Gedetecteerde taal:', detectedLang);
+
     // Sequentially transcribe each chunk
     const transcripts: string[] = [];
     for (const chunk of chunks) {
-      const text = await transcribeAudio(chunk);
-      console.log(text);
+      const text = await transcribeAudio(chunk, detectedLang);
       transcripts.push(text);
     }
 
-    // Combine all transcripts
     const fullText = transcripts.join('\n').trim();
 
     // Optionally summarize combined transcript
