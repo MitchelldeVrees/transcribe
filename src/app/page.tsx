@@ -138,6 +138,59 @@ export default function Home() {
     }
   };
 
+  // --- add this inside your Home() component ---
+const handleDemo = () => {
+  // set up top‐metrics
+  setAudioDuration("3:24");
+  setWordCount(472);
+  setProcessingTime(45);
+
+  // a multi-paragraph transcript sample
+  setTranscript(
+    `Welkom bij onze demo van Audio Transcriber.  
+In deze demo zie je hoe een langer gesprek wordt omgezet in tekst.  
+
+Gastspreker 1: “Vandaag bespreken we de roadmap voor Q3…”  
+Gastspreker 2: “We willen vooral focussen op…”  
+
+En zo biedt deze tool je direct bruikbare output.`
+  );
+
+  // a concise summary
+  setSummary(
+    `• Doel: Roadmap Q3  
+• Focus: AI-integraties en performanceoptimalisatie  
+• Volgende stappen: team kick-off, API-design workshop`
+  );
+
+  // action items
+  setActionItems(
+    `- Plan kick-off meeting voor AI-integratie (deadline: 25 juni)  
+- Opstellen API-design document (verantwoordelijke: Els)  
+- Set up performance benchmark omgeving`
+  );
+
+  // optional: speaker-tagged transcript
+  setSpeakersTranscript(
+    `Speaker 1: Vandaag bespreken we de roadmap voor Q3.  
+Speaker 2: We willen vooral focussen op AI-integraties en performanceoptimalisatie.`
+  );
+
+  // example word frequencies
+  setWordFrequencies([
+    { word: "roadmap", count: 4 },
+    { word: "AI-integratie", count: 3 },
+    { word: "performance", count: 2 },
+    { word: "demo", count: 2 },
+    { word: "team", count: 1 },
+    // …add a few more if you like…
+  ]);
+
+  // show the results panel
+  setStage("results");
+};
+
+
   const exportToWord = async () => {
     if (!transcript) {
       alert("Er is geen transcript beschikbaar.");
@@ -358,6 +411,13 @@ export default function Home() {
     </label>
   </div>
 </div>
+<button
+                id="demo-btn"
+                 onClick={handleDemo}
+                 className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200 flex items-center ml-4"
+               >
+                 <i className="fas fa-play mr-2"></i> Demo
+               </button>
    
         <div className="bg-white rounded-xl shadow-lg overflow-hidden mb-8 transition-all duration-300">
           {stage === "upload" && (
@@ -380,7 +440,7 @@ export default function Home() {
                 <input
                   type="file"
                   id="audio-upload"
-                  accept=".mp3,.mp4,.mpeg,.mpga,.m4a,.wav,.webm"
+                  accept="audio/mpeg,audio/mp4,audio/wav,video/mp4,video/webm"
                   className="hidden"
                   onChange={handleFileChange}
                 />
@@ -418,6 +478,7 @@ export default function Home() {
                     >
                       <i className="fas fa-keyboard mr-2"></i> Transcribe
                     </button>
+              
                   </div>
 
                   <div className="audio-visualizer mb-4">
