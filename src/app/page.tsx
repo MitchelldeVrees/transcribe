@@ -16,6 +16,7 @@ interface TranscribeResponse {
 export default function Home() {
   // States for file data and transcription
   const progressInterval = useRef<NodeJS.Timeout>();
+  const [transcripts, setTranscripts] = useState<Transcript[]>([])
 
   const [file, setFile] = useState<File | null>(null);
   const [fileName, setFileName] = useState("");
@@ -55,6 +56,17 @@ export default function Home() {
       handleFiles(files);
     }
   };
+
+  useEffect(() => {
+    fetch('/api/account')
+      .then((res) => {
+        if (!res.ok) throw new Error('Network response was not ok')
+        return res.json()
+      })
+      .then((data) => setTranscripts(data.transcripts))
+      .catch((err) => setError(err.message))
+
+  }, [])
 
   useEffect(() => {
     // whenever we enter "loading", start fresh
@@ -260,6 +272,7 @@ export default function Home() {
 
   
   return (
+    
     <div className="bg-gray-50 min-h-screen">
       {/* Inline CSS styles for waveform and visualizer */}
       <style jsx global>{`
