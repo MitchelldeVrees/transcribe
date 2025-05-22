@@ -56,7 +56,7 @@ export async function splitAudioFile(
 
   // bepaal extensie (laat alles na de laatste '.' in de naam)
   const parts = file.name.split(".");
-  const origExt = parts.length > 1 ? parts.pop()!.toLowerCase() : "";
+  const origExt = file.type
   const needsReencode = !supportedExts.has(origExt);
 
   // kies uitvoer-extensie en build ffmpeg-args
