@@ -174,7 +174,12 @@ export default function Home() {
     setProgress(0);
   
     const startTime = performance.now();
-  
+    console.log('Uploading chunk:', {
+      name: file.name,
+      type: file.type,
+      size: file.size
+    });
+    
     try {
       // 1) Split audio en chunk-files
       const chunks = await splitAudioFile(file, 20 * 60);
