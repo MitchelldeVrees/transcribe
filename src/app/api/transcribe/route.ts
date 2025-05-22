@@ -90,8 +90,7 @@ async function detectLanguage(file: File, maxBytes = 5 * 1024 * 1024): Promise<s
 
   if (!res.ok) {
     const errorText = await res.text();
-    console.error('Language detection error:', errorText);
-    throw new Error('Taal detectie mislukt: ' + errorText);
+    throw new Error('Taal detectie mislukt: ');
   }
 
   const json = await res.json();
@@ -120,7 +119,7 @@ async function summarizeTranscript(fullText: string, detectedLang: string): Prom
       {
         role: "user",
         content: `
-          Ik heb een transcript voor jou in het ${detectedLang}. Er kunnen spelfouten in de transcriptie zitten. Verbeter dit en maak dan een samenvatting. De samenvatting hoeft niet beknopt dus mag zeker uitgebreid zijn maar er hoeft ook geen onnodige informatie in te zitten. Daarnaast wil ik ook een aparte kop voor actiepunten die benoemd zijn in het transcript. En ik wil alle vragen die gesteld zijn en de daarbij behorende antwoorden in een aparte kop genaamd qna. Geef de output in JSON met de volgende keys:
+          Ik heb een transcript voor jou in het ${detectedLang}. Er kunnen spelfouten in de transcriptie zitten. Verbeter de spelfouten en maak een samenvatting. Je hoeft geen beknopte samenvatting te maken. Gebruik bulletpoints en logische verhalen zodat iemand die de samenvatting leest. Niet de hele context hoef te snappen. Daarnaast wil ik ook een aparte kop voor actiepunten die benoemd zijn in het transcript. Onder actiepunten zijn dingen die gezegd zijn in het transcript die iemand moet gaan doen of gaan uitvoeren. Daarnaast wil ik alle vragen die gesteld zijn en de daarbij behorende antwoorden in een aparte kop genaamd qna. Geef de output in JSON met de volgende keys:
           {
             "summary": string,
             "actionItems": string,
@@ -134,7 +133,6 @@ async function summarizeTranscript(fullText: string, detectedLang: string): Prom
     temperature: 0.5,
   };
   
-  console.log(payload);
 
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -174,7 +172,7 @@ if (message.function_call) {
     throw new Error("Kon zelfs na strippen niet parsen:\n" + content);
   }
 }
-
+  console.log(data);
 
   return {
     summary: data.summary || '',
