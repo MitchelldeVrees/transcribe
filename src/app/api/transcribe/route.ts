@@ -16,6 +16,12 @@ if (!process.env.OPENAI_API_KEY) {
 /**
  * Transcribe a single chunk, met optionele taalhint
  */
+const languageMap: Record<string,string> = {
+  netherlands: "nl",
+  dutch:       "nl",
+  english:     "en",
+};
+
 async function transcribeAudio(file: File, language?: string): Promise<string> {
   const buffer = await file.arrayBuffer();
   const blob = new Blob([buffer], { type: file.type });
@@ -24,10 +30,14 @@ async function transcribeAudio(file: File, language?: string): Promise<string> {
   form.append("file", blob, file.name);
   form.append("model", "gpt-4o-mini-transcribe");
 
-  // Alleen toevoegen als we al een taal weten
+  // only append a language hint if it's one we recognize
   if (language) {
-    if (language === 'netherlands') {
-      language = 'nl';
+    const code = languageMap[language.toLowerCase()];
+    if (code) {
+      form.append("language", code);
+      console.log("Using language hint:", code);
+    } else {
+      console.log("Unrecognized language:", language, "— skipping language hint");
     }
     if (language === 'english') {
       language = 'en';
@@ -35,16 +45,18 @@ async function transcribeAudio(file: File, language?: string): Promise<string> {
     if (language === 'dutch') {
       language = 'nl';
     }
+    if (language === 'netherlands') {
+      language = 'nl';
+    } 
     form.append("language", language);
+
   }
 
-  const res = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-    },
+  const res = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
     body: form as any,
-    cache: 'no-store',
+    cache: "no-store",
   });
 
   if (!res.ok) {
@@ -71,6 +83,8 @@ async function detectLanguage(file: File, maxBytes = 5 * 1024 * 1024): Promise<s
   const buffer = await sample.arrayBuffer();
   const blob = new Blob([buffer], { type: file.type });
 
+  
+
   const form = new FormData();
   form.append("file", blob, file.name);
   form.append("model", "whisper-1");
@@ -87,8 +101,7 @@ async function detectLanguage(file: File, maxBytes = 5 * 1024 * 1024): Promise<s
 
   if (!res.ok) {
     const errorText = await res.text();
-    console.error('Language detection error:', errorText);
-    throw new Error('Taal detectie mislukt: ' + errorText);
+    throw new Error('Taal detectie mislukt: ');
   }
 
   const json = await res.json();
@@ -101,7 +114,7 @@ async function detectLanguage(file: File, maxBytes = 5 * 1024 * 1024): Promise<s
 /**
  * Summarize the full transcript via function calling
  */
-async function summarizeTranscript(fullText: string): Promise<{
+async function summarizeTranscript(fullText: string, detectedLang: string): Promise<{
   summary: string;
   actionItems: string;
   qna: string;
@@ -117,7 +130,7 @@ async function summarizeTranscript(fullText: string): Promise<{
       {
         role: "user",
         content: `
-          Ik heb een transcript voor jou in het Nederlands. Er kunnen spelfouten in de transcriptie zitten. Verbeter dit en maak dan een samenvatting. De samenvatting hoeft niet beknopt dus mag zeker uitgebreid zijn maar er hoeft ook geen onnodige informatie in te zitten. Daarnaast wil ik ook een aparte kop voor actiepunten die benoemd zijn in het transcript. En ik wil alle vragen die gesteld zijn en de daarbij behorende antwoorden in een aparte kop genaamd qna. Geef de output in JSON met de volgende keys:
+          Ik heb een transcript voor jou in het ${detectedLang}. Er kunnen spelfouten in de transcriptie zitten. Verbeter de spelfouten en maak een samenvatting. Je hoeft geen beknopte samenvatting te maken. Gebruik bulletpoints en logische verhalen zodat iemand die de samenvatting leest. Niet de hele context hoef te snappen. Daarnaast wil ik ook een aparte kop voor actiepunten die benoemd zijn in het transcript. Onder actiepunten zijn dingen die gezegd zijn in het transcript die iemand moet gaan doen of gaan uitvoeren. Daarnaast wil ik alle vragen die gesteld zijn en de daarbij behorende antwoorden in een aparte kop genaamd qna. Geef de output in JSON met de volgende keys:
           {
             "summary": string,
             "actionItems": string,
@@ -131,7 +144,6 @@ async function summarizeTranscript(fullText: string): Promise<{
     temperature: 0.5,
   };
   
-  console.log(payload);
 
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -171,7 +183,7 @@ if (message.function_call) {
     throw new Error("Kon zelfs na strippen niet parsen:\n" + content);
   }
 }
-
+  console.log(data);
 
   return {
     summary: data.summary || '',
@@ -184,6 +196,8 @@ export async function POST(request: NextRequest) {
   try {
     
     const formData = await request.formData();
+    
+
     // Collect all uploaded chunks
     const rawFiles = formData.getAll('audioFile');
     const chunks: File[] = rawFiles.filter((f) => f instanceof File) as File[];
@@ -215,7 +229,7 @@ export async function POST(request: NextRequest) {
 
     if (formData.get('enableSummarization') === 'true') {
       console.log("Generat  ing summary...");
-      const parsed = await summarizeTranscript(fullText);
+      const parsed = await summarizeTranscript(fullText, detectedLang);
       console.log(parsed)
       summary = parsed.summary;
       actionItems = parsed.actionItems;
