@@ -40,25 +40,7 @@ export default function ResultsSection({
   return (
     <div id="results-section">
       {/* Header bar */}
-      <div className="bg-blue-600 text-white p-6 flex items-center justify-between rounded-lg">
-        <h2 className="text-2xl font-bold flex items-center">
-          <i className="fas fa-file-alt mr-3"></i> Transcript resultaten
-        </h2>
-        <button
-          onClick={handleSave}
-          disabled={saving || !session}
-          className={`px-4 py-2 rounded ${
-            session
-              ? saving
-                ? "bg-gray-400 text-white cursor-not-allowed"
-                : "bg-green-600 text-white hover:bg-green-700"
-              : "bg-gray-300 text-gray-600 cursor-not-allowed"
-          }`}
-        >
-          {saving ? "Saving…" : session ? "Save to Account" : "Sign in to Save"}
-        </button>
-      </div>
-
+      
       {/* Metrics & Content */}
       <div className="p-6">
         {/* Metrics */}
@@ -240,16 +222,7 @@ export default function ResultsSection({
         </div>
       </div>
 
-      {/* New transcription footer */}
-      <div className="border-t border-gray-200 p-6 bg-gray-50">
-        <button
-          id="new-transcription"
-          onClick={handleNewTranscription}
-          className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200 flex items-center mx-auto"
-        >
-          <i className="fas fa-redo mr-2"></i> Begin nieuwe transcriptie
-        </button>
-      </div>
+      
     </div>
   );
 }
