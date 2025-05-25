@@ -17,10 +17,25 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ transcripts }: SidebarProps) {
-  const { data: session } = useSession();
-
+  const { data: session, status } = useSession();
+  
+  if (status === "unauthenticated") {
+    return (
+      <aside className="w-64 bg-blue-600 text-white flex flex-col h-full sticky top-0">
+        {/* …header… */}
+        <div className="p-4 border-b border-blue-700">
+          <p className="text-sm text-blue-200 mb-2">
+            Log in om je transcriptie te bekijken en op te slaan.
+          </p>
+          <button onClick={() => handleSignIn()} /* … */>
+            Login
+          </button>
+        </div>
+      </aside>
+    );
+  }
   return (
-    <aside className="w-64 bg-blue-600 text-white flex flex-col h-full">
+    <aside className="w-64 bg-blue-600 text-white flex flex-col h-full sticky top-0">
       {/* Logo / Title */}
       <div className="p-4 border-b border-blue-700">
         <h1 className="text-xl font-bold flex items-center">
@@ -33,7 +48,7 @@ export default function Sidebar({ transcripts }: SidebarProps) {
       {!session && (
         <div className="p-4 border-b border-blue-700">
           <p className="text-sm text-blue-200 mb-2">
-            Log in om je transcripts te bekijken en op te slaan.
+            Log in om je transcriptie te bekijken en op te slaan.
           </p>
           <button
             onClick={() => handleSignIn()}
@@ -49,7 +64,7 @@ export default function Sidebar({ transcripts }: SidebarProps) {
         <div className="p-4 border-b border-blue-700">
           <h2 className="font-medium flex items-center">
             <i className="fas fa-history mr-2"></i>
-            Recente Transcripts
+            Recente Transcriptie
           </h2>
         </div>
 
@@ -74,16 +89,19 @@ export default function Sidebar({ transcripts }: SidebarProps) {
                       })}
                     </div>
                   </Link>
+                  
                 );
+                
               })
+              
             ) : (
               <div className="p-4 text-blue-300 italic">
-                Nog geen transcipts.
+                Nog geen transciptie.
               </div>
             )
           ) : (
             <div className="p-4 text-blue-300 italic">
-              Log in om je transcripts te bekijken.
+              Log in om deze transcriptie te bekijken.
             </div>
           )}
         </div>
