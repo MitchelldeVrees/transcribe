@@ -5,6 +5,9 @@ import { saveAs } from "file-saver";
 import { Document, Packer, Paragraph, TextRun } from "docx";
 import { stopwords } from "./stopwords"; // adjust path as needed
 import { loadFFmpeg, splitAudioFile } from "../lib/ffmpegHelper";
+import Sidebar, { Transcript } from "../components/Sidebar";
+import { useSession } from "next-auth/react";
+import ResultsSection from "@/components/ResultsSection";
 
 interface TranscribeResponse {
   text: string;
@@ -17,6 +20,8 @@ export default function Home() {
   // States for file data and transcription
   const progressInterval = useRef<NodeJS.Timeout>();
   const [transcripts, setTranscripts] = useState<Transcript[]>([])
+  const { data: session } = useSession();
+  const [saving, setSaving] = useState(false);
 
   const [file, setFile] = useState<File | null>(null);
   const [fileName, setFileName] = useState("");
@@ -48,6 +53,45 @@ export default function Home() {
 
   // Reference to the audio element
   const audioRef = useRef<HTMLAudioElement>(null);
+
+  async function handleSave() {
+    if (!session) return;           // extra guard
+    setSaving(true);
+    try {
+      const res = await fetch("/api/transcipts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: fileName || "Untitled Transcript",
+          content: transcript,
+          summary,
+          actionItems,
+          qna,
+        }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      alert("Transcript saved successfully!");
+      // optionally re-fetch `transcripts` list here
+    } catch (err: any) {
+      console.error("Save failed:", err);
+      alert("Failed to save transcript: " + err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  
+  useEffect(() => {
+    if (session) {
+      fetch("/api/transcipts")
+        .then((res) => {
+          if (!res.ok) throw new Error("transcrive");
+          return res.json();
+        })
+        .then((data) => setTranscripts(data.transcripts))
+        .catch((err) => setError(err.message));
+    }
+  }, [session]);
 
   // Handle file selection
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -273,7 +317,10 @@ export default function Home() {
   
   return (
     
+    
     <div className="bg-gray-50 min-h-screen">
+      
+
       {/* Inline CSS styles for waveform and visualizer */}
       <style jsx global>{`
         .waveform {
@@ -318,7 +365,13 @@ export default function Home() {
         }
       `}</style>
 
+<div className="flex h-screen">
+
+{<Sidebar transcripts={transcripts} />}
+<div className="flex-1">
+
       <div className="container mx-auto px-4 py-12 max-w-4xl">
+
         {/* New controls row: model selector and summarization toggle */}
        
 
@@ -492,11 +545,25 @@ export default function Home() {
 
           {stage === "results" && (
             <div id="results-section">
-              <div className="bg-blue-600 text-white p-6">
-                <h2 className="text-2xl font-bold flex items-center">
-                  <i className="fas fa-file-alt mr-3"></i> Transcript resultaten
-                </h2>
-              </div>
+              <div className="bg-blue-600 text-white p-6 flex items-center justify-between">
+  <h2 className="text-2xl font-bold flex items-center">
+    <i className="fas fa-file-alt mr-3"></i> Transcript resultaten
+  </h2>
+  <button
+    onClick={handleSave}
+    disabled={saving || !session}
+    className={`px-4 py-2 rounded ${
+      session
+        ? saving
+          ? "bg-gray-400 text-white cursor-not-allowed"
+          : "bg-green-600 text-white hover:bg-green-700"
+        : "bg-gray-300 text-gray-600 cursor-not-allowed"
+    }`}
+  >
+    {saving ? "Saving…" : session ? "Save to Account" : "Sign in to Save"}
+  </button>
+</div>
+
               <div className="p-6">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                   <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
@@ -680,6 +747,7 @@ export default function Home() {
   </div>
 </div>
               </div>
+              
               <div className="border-t border-gray-200 p-6 bg-gray-50">
                 <button
                   id="new-transcription"
@@ -698,5 +766,7 @@ export default function Home() {
         </div>
       </div>
     </div>
+    </div>
+  </div>
   );
 }

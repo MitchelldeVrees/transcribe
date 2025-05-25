@@ -32,6 +32,9 @@ async function transcribeAudio(file: File, language?: string): Promise<string> {
     if (language === 'english') {
       language = 'en';
     }
+    if (language === 'dutch') {
+      language = 'nl';
+    }
     form.append("language", language);
   }
 
