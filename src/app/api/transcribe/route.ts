@@ -39,6 +39,17 @@ async function transcribeAudio(file: File, language?: string): Promise<string> {
     } else {
       console.log("Unrecognized language:", language, "— skipping language hint");
     }
+    if (language === 'english') {
+      language = 'en';
+    }
+    if (language === 'dutch') {
+      language = 'nl';
+    }
+    if (language === 'netherlands') {
+      language = 'nl';
+    } 
+    form.append("language", language);
+
   }
 
   const res = await fetch("https://api.openai.com/v1/audio/transcriptions", {
