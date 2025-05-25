@@ -16,6 +16,12 @@ interface TranscribeResponse {
   qna?: string;
 }
 
+interface QnaItem {
+  question: string;
+  answer: string;
+}
+
+
 export default function Home() {
   // States for file data and transcription
   const progressInterval = useRef<NodeJS.Timeout>();
@@ -37,7 +43,7 @@ export default function Home() {
   const [summary, setSummary] = useState("");
   const [wordFrequencies, setWordFrequencies] = useState<{ word: string; count: number }[]>([]);
   const [actionItems, setActionItems] = useState("");
-  const [qna, setQna] = useState("");
+  const [qna, setQna] = useState<QnaItem[]>([]);
   const [estimatedSec, setEstimatedSec] = useState(0);
   // At the top with your other states
   const [speakersTranscript, setSpeakersTranscript] = useState("");
@@ -230,7 +236,12 @@ export default function Home() {
     setProgress(0);
   
     const startTime = performance.now();
-  
+    console.log('Uploading chunk:', {
+      name: file.name,
+      type: file.type,
+      size: file.size
+    });
+    
     try {
       // 1) Split audio en chunk-files
       const chunks = await splitAudioFile(file, 20 * 60);
@@ -257,8 +268,10 @@ export default function Home() {
       setTranscript(data.text);
       setSummary(data.summary ?? "");
       setActionItems(data.actionItems ?? "");
-      setQna(data.qna ?? "");
-  
+      console.log(data.qna);
+      setQna(Array.isArray(data.qna) ? data.qna : []);
+      console.log("QNA");
+      console.log(qna);
       // 5) Meet en zet verwerkingstijd
       setProcessingTime(
         Math.round((performance.now() - startTime) / 1000)
@@ -730,6 +743,34 @@ export default function Home() {
     </div>
   </div>
 )}
+
+{qna.length > 0 && (
+  <div className="mb-6">
+    <div className="flex justify-between items-center mb-4">
+      <h3 className="text-lg font-semibold text-gray-800">Q&A</h3>
+      <button
+        onClick={() => navigator.clipboard.writeText(
+          qna.map(({question, answer}) => `${question}\n${answer}`).join("\n\n")
+        )}
+        className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors duration-200 flex items-center"
+      >
+        <i className="fas fa-copy mr-2"></i> Kopieer Q&A
+      </button>
+    </div>
+    <div
+      id="qna-container"
+      className="bg-gray-50 border border-gray-200 rounded-lg p-4 max-h-96 overflow-y-auto text-gray-800"
+    >
+      {qna.map(({ question, answer }, idx) => (
+        <div key={idx} className="mb-4">
+          <p className="font-medium">{`${idx + 1}. ${question}`}</p>
+          <p className="pl-4">{answer}</p>
+        </div>
+      ))}
+    </div>
+  </div>
+)}
+
 
 <div className="bg-blue-50 border border-blue-100 rounded-lg p-4">
   <h3 className="text-lg font-semibold text-blue-800 mb-3 flex items-center">
