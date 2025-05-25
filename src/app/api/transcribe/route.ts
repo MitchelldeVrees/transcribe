@@ -110,7 +110,7 @@ async function summarizeTranscript(fullText: string, detectedLang: string): Prom
 }> {
 
   const payload = {
-    model: "gpt-4o-mini",
+    model: "gpt-4.1",
     messages: [
       {
         role: "system",
@@ -119,7 +119,24 @@ async function summarizeTranscript(fullText: string, detectedLang: string): Prom
       {
         role: "user",
         content: `
-          Ik heb een transcript voor jou in het ${detectedLang}. Er kunnen spelfouten in de transcriptie zitten. Verbeter de spelfouten en maak een samenvatting. Je hoeft geen beknopte samenvatting te maken. Gebruik bulletpoints en logische verhalen zodat iemand die de samenvatting leest. Niet de hele context hoef te snappen. Daarnaast wil ik ook een aparte kop voor actiepunten die benoemd zijn in het transcript. Onder actiepunten zijn dingen die gezegd zijn in het transcript die iemand moet gaan doen of gaan uitvoeren. Daarnaast wil ik alle vragen die gesteld zijn en de daarbij behorende antwoorden in een aparte kop genaamd qna. Geef de output in JSON met de volgende keys:
+          Ik heb een transcript voor jou in de Taal:"${detectedLang}". 
+          Als er geen taal is gedefineerd gebruik dan de taal van de input/transcript. 
+          Er kunnen spelfouten in de transcriptie zitten. Verbeter de spelfouten en maak een samenvatting. 
+          
+          Maak als professionele samenvatter een beknopte en uitgebreide samenvatting van de aangeleverde tekst, of het nu een artikel, bericht, conversatie of passage betreft, en houd je daarbij aan de volgende richtlijnen:
+
+Maak een samenvatting die gedetailleerd, grondig, diepgaand en complex is, maar zorg wel voor helderheid en beknoptheid.
+
+Neem de belangrijkste ideeën en essentiële informatie op, vermijd overbodige taal en concentreer je op kritische aspecten.
+
+Vertrouw strikt op de aangeleverde tekst, zonder externe informatie.
+
+Maak de samenvatting op in alineavorm voor een gemakkelijk begrip.
+
+
+Door deze geoptimaliseerde prompt te volgen, genereer je een effectieve samenvatting die de essentie van de tekst op een duidelijke, beknopte en leesvriendelijke manier samenvat.
+     Gebruik titels en bulletpoints om het overzichtelijk te houden. Wanneer je een titel maakt gebruik dan de tag <b>titel</b> 
+      Een goede lengte voor een samenvatting is de helft van de originele transcriptie. Als de samenvatting 5000 woorden is dan is het een goed uitgangspunt om rond de 2500 woorden te hebben. Zolang er geen dubbele/onnodige informatie in komt te staan om zo alleen maar de ruimte op te vullen. Daarnaast wil ik ook een aparte kop voor actiepunten die benoemd zijn in het transcript. Actiepunten zijn dingen die gezegd zijn in het transcript die iemand moet gaan doen of gaan uitvoeren. Daarnaast wil ik alle vragen die gesteld zijn en de daarbij behorende antwoorden in een aparte kop genaamd qna. Geef de output in JSON met de volgende keys:
           {
             "summary": string,
             "actionItems": string,
@@ -199,7 +216,6 @@ export async function POST(request: NextRequest) {
     }
 
     const detectedLang = await detectLanguage(chunks[0]);
-    console.log('Gedetecteerde taal:', detectedLang);
 
     // Sequentially transcribe each chunk
     const transcripts: string[] = [];
@@ -214,10 +230,8 @@ export async function POST(request: NextRequest) {
     let summary = '';
     let actionItems = '';
     let qna = '';
-    console.log('Samenvatten:', formData.get('enableSummarization')); 
 
     if (formData.get('enableSummarization') === 'true') {
-      console.log("Generat  ing summary...");
       const parsed = await summarizeTranscript(fullText, detectedLang);
       console.log(parsed)
       summary = parsed.summary;
