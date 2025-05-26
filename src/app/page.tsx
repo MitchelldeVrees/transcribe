@@ -5,6 +5,9 @@ import { saveAs } from "file-saver";
 import { Document, Packer, Paragraph, TextRun } from "docx";
 import { stopwords } from "./stopwords"; // adjust path as needed
 import { loadFFmpeg, splitAudioFile } from "../lib/ffmpegHelper";
+import Sidebar, { Transcript } from "../components/Sidebar";
+import { useSession } from "next-auth/react";
+import ResultsSection from "@/components/ResultsSection";
 
 interface TranscribeResponse {
   text: string;
@@ -13,9 +16,18 @@ interface TranscribeResponse {
   qna?: string;
 }
 
+interface QnaItem {
+  question: string;
+  answer: string;
+}
+
+
 export default function Home() {
   // States for file data and transcription
   const progressInterval = useRef<NodeJS.Timeout>();
+  const [transcripts, setTranscripts] = useState<Transcript[]>([])
+  const { data: session } = useSession();
+  const [saving, setSaving] = useState(false);
 
   const [file, setFile] = useState<File | null>(null);
   const [fileName, setFileName] = useState("");
@@ -31,7 +43,7 @@ export default function Home() {
   const [summary, setSummary] = useState("");
   const [wordFrequencies, setWordFrequencies] = useState<{ word: string; count: number }[]>([]);
   const [actionItems, setActionItems] = useState("");
-  const [qna, setQna] = useState("");
+  const [qna, setQna] = useState<QnaItem[]>([]);
   const [estimatedSec, setEstimatedSec] = useState(0);
   // At the top with your other states
   const [speakersTranscript, setSpeakersTranscript] = useState("");
@@ -48,6 +60,45 @@ export default function Home() {
   // Reference to the audio element
   const audioRef = useRef<HTMLAudioElement>(null);
 
+  async function handleSave() {
+    if (!session) return;           // extra guard
+    setSaving(true);
+    try {
+      const res = await fetch("/api/transcipts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: fileName || "Untitled Transcript",
+          content: transcript,
+          summary,
+          actionItems,
+          qna,
+        }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      alert("Transcript saved successfully!");
+      // optionally re-fetch `transcripts` list here
+    } catch (err: any) {
+      console.error("Save failed:", err);
+      alert("Failed to save transcript: " + err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  
+  useEffect(() => {
+    if (session) {
+      fetch("/api/transcipts")
+        .then((res) => {
+          if (!res.ok) throw new Error("transcrive");
+          return res.json();
+        })
+        .then((data) => setTranscripts(data.transcripts))
+        .catch((err) => setError(err.message));
+    }
+  }, [session]);
+
   // Handle file selection
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -55,6 +106,17 @@ export default function Home() {
       handleFiles(files);
     }
   };
+
+  useEffect(() => {
+    fetch('/api/account')
+      .then((res) => {
+        if (!res.ok) throw new Error('Network response was not ok')
+        return res.json()
+      })
+      .then((data) => setTranscripts(data.transcripts))
+      .catch((err) => setError(err.message))
+
+  }, [])
 
   useEffect(() => {
     // whenever we enter "loading", start fresh
@@ -227,7 +289,12 @@ Speaker 2: We willen vooral focussen op AI-integraties en performanceoptimalisat
     setProgress(0);
   
     const startTime = performance.now();
-  
+    console.log('Uploading chunk:', {
+      name: file.name,
+      type: file.type,
+      size: file.size
+    });
+    
     try {
       // 1) Split audio en chunk-files
       const chunks = await splitAudioFile(file, 20 * 60);
@@ -254,8 +321,10 @@ Speaker 2: We willen vooral focussen op AI-integraties en performanceoptimalisat
       setTranscript(data.text);
       setSummary(data.summary ?? "");
       setActionItems(data.actionItems ?? "");
-      setQna(data.qna ?? "");
-  
+      console.log(data.qna);
+      setQna(Array.isArray(data.qna) ? data.qna : []);
+      console.log("QNA");
+      console.log(qna);
       // 5) Meet en zet verwerkingstijd
       setProcessingTime(
         Math.round((performance.now() - startTime) / 1000)
@@ -313,7 +382,11 @@ Speaker 2: We willen vooral focussen op AI-integraties en performanceoptimalisat
 
   
   return (
+    
+    
     <div className="bg-gray-50 min-h-screen">
+      
+
       {/* Inline CSS styles for waveform and visualizer */}
       <style jsx global>{`
         .waveform {
@@ -358,7 +431,13 @@ Speaker 2: We willen vooral focussen op AI-integraties en performanceoptimalisat
         }
       `}</style>
 
+<div className="flex h-screen">
+
+{<Sidebar transcripts={transcripts} />}
+<div className="flex-1">
+
       <div className="container mx-auto px-4 py-12 max-w-4xl">
+
         {/* New controls row: model selector and summarization toggle */}
        
 
@@ -540,11 +619,25 @@ Speaker 2: We willen vooral focussen op AI-integraties en performanceoptimalisat
 
           {stage === "results" && (
             <div id="results-section">
-              <div className="bg-blue-600 text-white p-6">
-                <h2 className="text-2xl font-bold flex items-center">
-                  <i className="fas fa-file-alt mr-3"></i> Transcript resultaten
-                </h2>
-              </div>
+              <div className="bg-blue-600 text-white p-6 flex items-center justify-between">
+  <h2 className="text-2xl font-bold flex items-center">
+    <i className="fas fa-file-alt mr-3"></i> Transcript resultaten
+  </h2>
+  <button
+    onClick={handleSave}
+    disabled={saving || !session}
+    className={`px-4 py-2 rounded ${
+      session
+        ? saving
+          ? "bg-gray-400 text-white cursor-not-allowed"
+          : "bg-green-600 text-white hover:bg-green-700"
+        : "bg-gray-300 text-gray-600 cursor-not-allowed"
+    }`}
+  >
+    {saving ? "Saving…" : session ? "Save to Account" : "Sign in to Save"}
+  </button>
+</div>
+
               <div className="p-6">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                   <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
@@ -712,6 +805,34 @@ Speaker 2: We willen vooral focussen op AI-integraties en performanceoptimalisat
   </div>
 )}
 
+{qna.length > 0 && (
+  <div className="mb-6">
+    <div className="flex justify-between items-center mb-4">
+      <h3 className="text-lg font-semibold text-gray-800">Q&A</h3>
+      <button
+        onClick={() => navigator.clipboard.writeText(
+          qna.map(({question, answer}) => `${question}\n${answer}`).join("\n\n")
+        )}
+        className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors duration-200 flex items-center"
+      >
+        <i className="fas fa-copy mr-2"></i> Kopieer Q&A
+      </button>
+    </div>
+    <div
+      id="qna-container"
+      className="bg-gray-50 border border-gray-200 rounded-lg p-4 max-h-96 overflow-y-auto text-gray-800"
+    >
+      {qna.map(({ question, answer }, idx) => (
+        <div key={idx} className="mb-4">
+          <p className="font-medium">{`${idx + 1}. ${question}`}</p>
+          <p className="pl-4">{answer}</p>
+        </div>
+      ))}
+    </div>
+  </div>
+)}
+
+
 <div className="bg-blue-50 border border-blue-100 rounded-lg p-4">
   <h3 className="text-lg font-semibold text-blue-800 mb-3 flex items-center">
     <i className="fas fa-chart-pie mr-2"></i> Woord frequentie
@@ -728,6 +849,7 @@ Speaker 2: We willen vooral focussen op AI-integraties en performanceoptimalisat
   </div>
 </div>
               </div>
+              
               <div className="border-t border-gray-200 p-6 bg-gray-50">
                 <button
                   id="new-transcription"
@@ -746,5 +868,7 @@ Speaker 2: We willen vooral focussen op AI-integraties en performanceoptimalisat
         </div>
       </div>
     </div>
+    </div>
+  </div>
   );
 }
