@@ -43,72 +43,68 @@ const extToMime: Record<string, string> = {
 const supportedExts = new Set(Object.keys(extToMime));
 
 /**
- * Split een audio File in segmenten van max segmentSec seconden.
+ * Split een audio File. Voor ondersteunde containers wordt het bestand
+ * simpelweg in stukken van maximaal ~24MB gesliced. Voor andere formaten
+ * vallen we terug op ffmpeg.wasm dat naar MP3 encodeert en in segmenten
+ * van segmentSec seconden splitst.
  * Retourneert een array met File-objects (.<ext>).
  */
 export async function splitAudioFile(
   file: File,
   segmentSec = 20 * 60
 ): Promise<File[]> {
-  if (!loaded) await loadFFmpeg();
+  const parts = file.name.split('.');
+  const origExt = parts.pop()?.toLowerCase() || '';
+  const mime = extToMime[origExt] || file.type;
 
-  // schrijf het originele bestand in WASM-FS
-  await ffmpeg.writeFile("input", await fetchFile(file));
+  // Quick path: slice the file if the container is supported
+  if (supportedExts.has(origExt)) {
+    const maxBytes = 24 * 1024 * 1024; // keep chunks <25MB for OpenAI
 
-  // bepaal extensie (laat alles na de laatste '.' in de naam)
-  const parts = file.name.split(".");
-  const origExt = file.type
-  const needsReencode = !supportedExts.has(origExt);
+    if (file.size <= maxBytes) {
+      return [file];
+    }
 
-  // kies uitvoer-extensie en build ffmpeg-args
-  let outputExt: string;
-  let ffArgs: string[];
-
-  if (!needsReencode) {
-    // puur container-copy split
-    outputExt = origExt;
-    console.log(`[FFmpeg] Only splitting (no re-encode) for .${origExt} files`);
-    ffArgs = [
-      "-i", "input",
-      "-vn",
-      "-map", "0:a",
-      "-f", "segment",
-      "-segment_time", String(segmentSec),
-      "-reset_timestamps", "1",
-      "-c", "copy",
-      `chunk_%03d.${outputExt}`
-    ];
-  } else {
-    // fallback: re-encode naar MP3
-    outputExt = "mp3";
-    console.log("[FFmpeg] Re-encoding to MP3 + splitting");
-    ffArgs = [
-      "-i", "input",
-      "-vn",
-      "-map", "0:a",
-      "-f", "segment",
-      "-segment_time", String(segmentSec),
-      "-reset_timestamps", "1",
-      "-c:a", "libmp3lame",
-      "-b:a", "128k",
-      `chunk_%03d.${outputExt}`
-    ];
+    const chunks: File[] = [];
+    for (let start = 0, idx = 0; start < file.size; start += maxBytes, idx++) {
+      const slice = file.slice(start, Math.min(start + maxBytes, file.size), mime);
+      chunks.push(
+        new File([slice], `chunk_${idx.toString().padStart(3, '0')}.${origExt}`, {
+          type: mime,
+        })
+      );
+    }
+    return chunks;
   }
 
-  // voer de segmentatie uit
+  // Fallback: use ffmpeg.wasm to re-encode and split
+  if (!loaded) await loadFFmpeg();
+  await ffmpeg.writeFile('input', await fetchFile(file));
+
+  const outputExt = 'mp3';
+  const ffArgs = [
+    '-i', 'input',
+    '-vn',
+    '-map', '0:a',
+    '-f', 'segment',
+    '-segment_time', String(segmentSec),
+    '-reset_timestamps', '1',
+    '-c:a', 'libmp3lame',
+    '-b:a', '128k',
+    `chunk_%03d.${outputExt}`,
+  ];
+
   await ffmpeg.exec(ffArgs);
 
-  // lees de gegenereerde chunks uit
-  const allFiles = await ffmpeg.listDir("/");
-  const chunkFiles = allFiles
-    .filter(f => f.name.match(new RegExp(`^chunk_\\d{3}\\.${outputExt}$`)));
+  const allFiles = await ffmpeg.listDir('/');
+  const chunkFiles = allFiles.filter((f) =>
+    f.name.match(new RegExp(`^chunk_\\d{3}\\.${outputExt}$`))
+  );
 
-  // bouw de File-array terug met de juiste MIME
   const chunks: File[] = await Promise.all(
     chunkFiles.map(async ({ name }) => {
-      const data = await ffmpeg.readFile(name, "binary") as Uint8Array;
-      const mime = extToMime[outputExt] || file.type;
-      return new File([data], name, { type: mime });
+      const data = (await ffmpeg.readFile(name, 'binary')) as Uint8Array;
+      return new File([data], name, { type: extToMime[outputExt] });
     })
   );
 
