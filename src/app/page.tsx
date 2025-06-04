@@ -4,7 +4,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { saveAs } from "file-saver";
 import { Document, Packer, Paragraph, TextRun } from "docx";
 import { stopwords } from "./stopwords"; // adjust path as needed
-import { loadFFmpeg, splitAudioFile } from "../lib/ffmpegHelper";
+
 import Sidebar, { Transcript } from "../components/Sidebar";
 import { useSession } from "next-auth/react";
 import ResultsSection from "@/components/ResultsSection";
@@ -47,10 +47,6 @@ export default function Home() {
   const [estimatedSec, setEstimatedSec] = useState(0);
   // At the top with your other states
   const [speakersTranscript, setSpeakersTranscript] = useState("");
-  const [ready, setReady] = useState(false);
-
-
-  const [ffmpegLoaded, setFfmpegLoaded] = useState(false);
 
   // New state: transcription model choice ("assembly" or "openai")
   const [model, setModel] = useState<"assembly" | "openai">("assembly");
@@ -144,12 +140,7 @@ export default function Home() {
     };
   }, [stage, estimatedSec]);
 
-  useEffect(() => {
-    (async () => {
-      await loadFFmpeg();
-      setReady(true);
-    })();
-  }, []);
+
 
   // Process selected file
   const handleFiles = (files: FileList) => {
@@ -243,12 +234,9 @@ export default function Home() {
     });
     
     try {
-      // 1) Split audio en chunk-files
-      const chunks = await splitAudioFile(file, 20 * 60);
-  
-      // 2) FormData & API-call
+      // 1) Prepare FormData with the original file
       const form = new FormData();
-      chunks.forEach((chunk) => form.append("audioFile", chunk));
+      form.append("audioFile", file);
       form.append("enableSummarization", summarization ? "true" : "false");
   
       const response = await fetch("/api/transcribe", {
