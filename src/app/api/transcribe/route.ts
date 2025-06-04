@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { splitAudioServer } from '@/lib/serverSplit';
 
 // Edge runtime for Cloudflare Workers
 export const runtime = 'nodejs';
@@ -217,7 +218,12 @@ export async function POST(request: NextRequest) {
 
     // Collect all uploaded chunks
     const rawFiles = formData.getAll('audioFile');
-    const chunks: File[] = rawFiles.filter((f) => f instanceof File) as File[];
+    let chunks: File[] = rawFiles.filter((f) => f instanceof File) as File[];
+
+    if (chunks.length === 1) {
+      // client sent a single file; split server-side
+      chunks = await splitAudioServer(chunks[0]);
+    }
 
     if (chunks.length === 0) {
       return NextResponse.json(
