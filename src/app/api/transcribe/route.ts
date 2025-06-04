@@ -101,6 +101,7 @@ async function detectLanguage(file: File, maxBytes = 5 * 1024 * 1024): Promise<s
 
   if (!res.ok) {
     const errorText = await res.text();
+    console.log(errorText);
     throw new Error('Taal detectie mislukt: ');
   }
 
