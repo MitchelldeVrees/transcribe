@@ -107,11 +107,14 @@ export default function Home() {
     if (session) {
       fetch("/api/transcripts")
         .then((res) => {
-          if (!res.ok) throw new Error("transcrive");
+          if (!res.ok) throw new Error("AUTH_ERROR");
           return res.json();
         })
         .then((data) => setTranscripts(data.transcripts))
-        .catch((err) => setError(err.message));
+        .catch((err) => {
+          console.error(err);
+          setError("Er is iets misgegaan bij het ophalen van je transcripts.");
+        });
     }
   }, [session]);
 
@@ -310,12 +313,15 @@ Speaker 2: We willen vooral focussen op AI-integraties en performanceoptimalisat
         const text   = await response.text();          // always grab raw
         if (!response.ok) {
           console.error("API error:", text);
-          throw new Error(text);
+          const msg = response.status >= 500
+            ? "Er is een fout opgetreden aan onze kant. Probeer het later opnieuw."
+            : "Er ging iets mis met je upload. Controleer je bestand en probeer opnieuw.";
+          throw new Error(msg);
 
         }
         if (!contentType.includes("application/json")) {
           console.error("Expected JSON but got:", text);
-          throw new Error("Ongeldig antwoord van de server.");
+          throw new Error("Er is iets misgegaan bij het verwerken. Probeer het later opnieuw.");
         }
         const data = JSON.parse(text);  // now safe to parse
 
@@ -363,7 +369,7 @@ Speaker 2: We willen vooral focussen op AI-integraties en performanceoptimalisat
       setStage("results");
     } catch (err: any) {
       console.error(err);
-      setError(err.message);
+      setError(err.message || "Er is iets misgegaan. Probeer het later opnieuw.");
       setStage("upload");
     }
   }

@@ -31,14 +31,14 @@ async function transcribeViaAzure(file: File): Promise<string> {
   if (!res.ok) {
     const text = await res.text();
     console.error(`Azure Function error (status ${res.status}):`, text);
-    throw new Error(`Azure transcriptie mislukt: ${text}`);
+    throw new Error('TRANSCRIBE_ERROR');
   }
 
   const contentType = res.headers.get("content-type") || "";
   if (!contentType.includes("application/json")) {
     const text = await res.text();
     console.error(`Expected JSON but got ${contentType}:`, text);
-    throw new Error(`Azure transcriptie mislukt: onverwacht response type ${contentType}`);
+    throw new Error('TRANSCRIBE_ERROR');
   }
 
   let payload: any;
@@ -47,12 +47,12 @@ async function transcribeViaAzure(file: File): Promise<string> {
   } catch {
     const text = await res.text();
     console.error("Invalid JSON from Azure Function:", text);
-    throw new Error("Azure transcriptie mislukt: ongeldige JSON response");
+    throw new Error('TRANSCRIBE_ERROR');
   }
 
   if (typeof payload.transcript !== "string") {
     console.error("Azure Function returned unexpected payload:", payload);
-    throw new Error("Ongeldig antwoord van Azure (geen transcript-veld).");
+    throw new Error('TRANSCRIBE_ERROR');
   }
 
   return payload.transcript.trim();
@@ -82,7 +82,7 @@ Return JSON with {"summary": string, "actionItems": string, "qna": string}.
   });
 
   const msg = completion.choices?.[0]?.message;
-  if (!msg) throw new Error("Geen geldig antwoord van Grok.");
+  if (!msg) throw new Error('SUMMARIZE_ERROR');
 
   let data: any;
   try {
@@ -96,7 +96,7 @@ Return JSON with {"summary": string, "actionItems": string, "qna": string}.
     }
   } catch (err) {
     console.error("JSON parse error:", err, "raw:", msg.content);
-    throw new Error("Kon niet parsen van Grok-antwoord.");
+    throw new Error('SUMMARIZE_ERROR');
   }
 
   return {
@@ -114,11 +114,12 @@ export async function POST(request: NextRequest) {
     GROK_BASE_URL: GROK_BASE_URL || null,
   });
   // 1) Validate environment
-  if (!AZURE_FUNCTION_URL) {
-    return NextResponse.json({ error: "Azure Function URL ontbreekt (env AZURE_FUNCTION_URL)." }, { status: 500 });
-  }
-  if (!GROK_API_KEY || !GROK_BASE_URL) {
-    return NextResponse.json({ error: "Grok credentials ontbreken (env GROK_API_KEY/GROK_BASE_URL)." }, { status: 500 });
+  if (!AZURE_FUNCTION_URL || !GROK_API_KEY || !GROK_BASE_URL) {
+    console.error("Missing configuration for transcription service");
+    return NextResponse.json(
+      { error: "Configuratiefout op de server." },
+      { status: 500 }
+    );
   }
 
   try {
@@ -138,6 +139,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ text: fullText, summary, actionItems, qna }, { status: 200 });
   } catch (err: any) {
     console.error("Error in /api/transcribe:", err);
-    return NextResponse.json({ error: err.message || "Interne serverfout" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Er is een fout opgetreden tijdens het verwerken. Probeer het later opnieuw." },
+      { status: 500 }
+    );
   }
 }
