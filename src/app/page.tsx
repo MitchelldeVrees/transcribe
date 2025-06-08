@@ -4,7 +4,6 @@ import React, { useState, useRef, useEffect } from "react";
 import { saveAs } from "file-saver";
 import { Document, Packer, Paragraph, TextRun } from "docx";
 import { stopwords } from "./stopwords"; // adjust path as needed
-import { loadFFmpeg, splitAudioFile } from "../lib/ffmpegHelper";
 import Sidebar, { Transcript } from "../components/Sidebar";
 import { useSession } from "next-auth/react";
 import ResultsSection from "@/components/ResultsSection";
@@ -47,13 +46,11 @@ export default function Home() {
   const [estimatedSec, setEstimatedSec] = useState(0);
   // At the top with your other states
   const [speakersTranscript, setSpeakersTranscript] = useState("");
-  const [ready, setReady] = useState(false);
 
 
   const [ffmpegLoaded, setFfmpegLoaded] = useState(false);
 
   // New state: transcription model choice ("assembly" or "openai")
-  const [model, setModel] = useState<"assembly" | "openai">("assembly");
   // New state: summarization enabled (true/false)
   const [summarization, setSummarization] = useState<boolean>(false);
 
@@ -107,17 +104,7 @@ export default function Home() {
     }
   };
 
-  useEffect(() => {
-    fetch('/api/account')
-      .then((res) => {
-        if (!res.ok) throw new Error('Network response was not ok')
-        return res.json()
-      })
-      .then((data) => setTranscripts(data.transcripts))
-      .catch((err) => setError(err.message))
-
-  }, [])
-
+  
   useEffect(() => {
     // whenever we enter "loading", start fresh
     if (stage === "loading") {
@@ -144,12 +131,6 @@ export default function Home() {
     };
   }, [stage, estimatedSec]);
 
-  useEffect(() => {
-    (async () => {
-      await loadFFmpeg();
-      setReady(true);
-    })();
-  }, []);
 
   // Process selected file
   const handleFiles = (files: FileList) => {
@@ -297,11 +278,9 @@ Speaker 2: We willen vooral focussen op AI-integraties en performanceoptimalisat
     
     try {
       // 1) Split audio en chunk-files
-      const chunks = await splitAudioFile(file, 20 * 60);
   
       // 2) FormData & API-call
       const form = new FormData();
-      chunks.forEach((chunk) => form.append("audioFile", chunk));
       form.append("enableSummarization", summarization ? "true" : "false");
   
       const response = await fetch("/api/transcribe", {
@@ -451,52 +430,7 @@ Speaker 2: We willen vooral focussen op AI-integraties en performanceoptimalisat
           </p>
         </div>
   {/* Transcription Model Dropdown */}
-  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-start gap-6 mb-6">
-  {/* Transcription Model Dropdown */}
-  <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full sm:w-auto">
-    <label htmlFor="model" className="font-medium text-gray-700 whitespace-nowrap">
-      Transcriptie Model:
-    </label>
-    <select
-      id="model"
-      value={model}
-      onChange={(e) => {
-        const selected = e.target.value as "assembly" | "openai";
-        setModel(selected);
-        if (selected === "assembly") {
-          setSummarization(false);
-        }
-      }}
-      className="block w-full sm:w-auto px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-    >
-      <option value="assembly">V1</option>
-      <option value="openai">V2</option>
-    </select>
-  </div>
-  <input type="hidden" name="debug" value="true" />
-
-  {/* Summarization Toggle */}
-  <div className="flex items-center gap-3">
-    <input
-      type="checkbox"
-      id="summarization"
-      checked={summarization}
-      onChange={(e) => setSummarization(e.target.checked)}
-      disabled={model === "assembly"}
-      className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-    />
-    <label htmlFor="summarization" className="font-medium text-gray-700 select-none">
-      Samenvatting
-    </label>
-  </div>
-</div>
-<button
-                id="demo-btn"
-                 onClick={handleDemo}
-                 className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200 flex items-center ml-4"
-               >
-                 <i className="fas fa-play mr-2"></i> Demo
-               </button>
+  
    
         <div className="bg-white rounded-xl shadow-lg overflow-hidden mb-8 transition-all duration-300">
           {stage === "upload" && (
