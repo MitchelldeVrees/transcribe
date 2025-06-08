@@ -1,8 +1,10 @@
 Om te runnen
 npm run dev
 
-om te deployen
-npm run deploy
+### Deployen naar Cloudflare Pages
+1. Installeer afhankelijkheden met `npm install`.
+2. Bouw de applicatie voor Cloudflare Pages met `npm run pages-build`.
+3. Commit en push je code naar GitHub zodat Pages automatisch buildt **of** run `npm run pages-deploy` om direct te deployen (gebruik de projectnaam `luisterslim` of pas deze aan in `package.json`).
 
 
 

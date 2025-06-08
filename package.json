@@ -4,7 +4,7 @@
   "cloudflare": {
     "label": "Next.js Framework Starter",
     "products": [
-      "Workers"
+      "Pages"
     ],
     "categories": [],
     "icon_urls": [
@@ -42,7 +42,6 @@
   },
   "devDependencies": {
     "@cloudflare/next-on-pages": "^1.13.12",
-    "@opennextjs/cloudflare": "^1.0.0-beta.3",
     "@tailwindcss/postcss": "^4.1.4",
     "@types/archiver": "^6.0.3",
     "@types/file-saver": "^2.0.7",
@@ -52,7 +51,6 @@
     "@types/react": "18.3.12",
     "@types/react-dom": "18.3.1",
     "autoprefixer": "^10.4.21",
-    "open-next": "^0.0.1",
     "postcss": "^8.5.3",
     "tailwindcss": "^4.1.4",
     "typescript": "5.8.2",
@@ -61,10 +59,10 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "cf-build": "npx opennextjs-cloudflare build",
-    "cf-deploy": "npx opennextjs-cloudflare deploy",
-    "deploy": "npm run cf-build && npm run cf-deploy",
+    "pages-build": "npx @cloudflare/next-on-pages",
+    "pages-deploy": "wrangler pages deploy .vercel/output --project-name luisterslim",
+    "deploy": "npm run pages-build && npm run pages-deploy",
     "upload-secrets": "node src/scripts/upload-secrets.js",
-    "publish": "npm run upload-secrets && npm run cf-build && npm run cf-deploy"
+    "publish": "npm run upload-secrets && npm run pages-build && npm run pages-deploy"
   }
 }

@@ -30,7 +30,7 @@ for (const key of secretKeys) {
   console.log(`Uploading secret ${key}…`);
   // Use printf to avoid shell‐escaping headaches
   execSync(
-    `printf %s '${val.replace(/'/g, "'\\\\''")}' | wrangler secret put ${key}`,
+    `printf %s '${val.replace(/'/g, "'\\\\''")}' | wrangler pages secret put ${key}`,
     { stdio: "inherit" }
   );
 }
