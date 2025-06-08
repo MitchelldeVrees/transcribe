@@ -1,13 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server';
+import OpenAI from 'openai';
 
-// The Azure Function’s URL must be set in your environment.
-// Example: AZURE_FUNCTION_URL="https://myfuncapp.azurewebsites.net/api/HttpTrigger2"
+// Azure Function URL (unchanged)
 const AZURE_FUNCTION_URL = process.env.AZURE_FUNCTION_URL;
 if (!AZURE_FUNCTION_URL) {
   throw new Error(
     "De Azure Function URL ontbreekt. Stel de AZURE_FUNCTION_URL-omgevingsvariabele in."
   );
 }
+
+// Grok (x.ai) client setup
+const GROK_API_KEY = process.env.GROK_API_KEY;
+const GROK_BASE_URL = process.env.GROK_BASE_URL; // e.g. "https://api.x.ai/v1"
+
+if (!GROK_API_KEY) {
+  throw new Error("Grok API key ontbreekt. Stel de GROK_API_KEY-omgevingsvariabele in.");
+}
+if (!GROK_BASE_URL) {
+  throw new Error("Grok base URL ontbreekt. Stel de GROK_BASE_URL-omgevingsvariabele in.");
+}
+
+const grokClient = new OpenAI({
+  apiKey: GROK_API_KEY,
+  baseURL: GROK_BASE_URL,
+});
 
 /**
  * Sends a single File object to the Azure Function and returns the "transcript" string.
@@ -22,7 +38,6 @@ async function transcribeViaAzure(file: File): Promise<string> {
   const res = await fetch(AZURE_FUNCTION_URL, {
     method: "POST",
     body: form as any,
-    // Note: no need for special headers; fetch will set the correct multipart boundary.
     cache: "no-store",
   });
 
@@ -33,7 +48,6 @@ async function transcribeViaAzure(file: File): Promise<string> {
   }
 
   const json = await res.json();
-  // We expect the Azure function to return: { "transcript": "…" }
   if (typeof json.transcript !== "string") {
     console.error("Ongeldig antwoord van Azure:", json);
     throw new Error("Ongeldig antwoord van Azure Function (geen transcript-veld).");
@@ -42,10 +56,7 @@ async function transcribeViaAzure(file: File): Promise<string> {
 }
 
 /**
- * Summarize the full transcript via OpenAI function calling (unchanged).
- * 
- * (Reuse your existing summarizeTranscript function verbatim, since it still
- * hits the OpenAI Chat completions endpoint.)
+ * Summarize the full transcript via Grok 3 Mini on xAI.
  */
 async function summarizeTranscript(
   fullText: string,
@@ -55,8 +66,8 @@ async function summarizeTranscript(
   actionItems: string;
   qna: string;
 }> {
-  const payload = {
-    model: "gpt-4.1",
+  const completion = await grokClient.chat.completions.create({
+    model: "grok-3-mini",
     messages: [
       {
         role: "system",
@@ -65,72 +76,49 @@ async function summarizeTranscript(
       {
         role: "user",
         content: `
-          Ik heb een transcript voor jou in de Taal:"${detectedLang}". 
-          Als er geen taal is gedefineerd gebruik dan de taal van de input/transcript. 
-          Er kunnen spelfouten in de transcriptie zitten. Verbeter de spelfouten en maak een samenvatting. 
-          
-          Maak als professionele samenvatter een beknopte en uitgebreide samenvatting van de aangeleverde tekst, of het nu een artikel, bericht, conversatie of passage betreft, en houd je daarbij aan de volgende richtlijnen:
+%${fullText}%
+        Act as a professional summarizer. Create a concise and comprehensive summary of the text enclosed in %% above, while adhering to the guidelines enclosed in [ ] below. 
 
-          Maak een samenvatting die gedetailleerd, grondig, diepgaand en complex is, maar zorg wel voor helderheid en beknoptheid.
-          Neem de belangrijkste ideeën en essentiële informatie op, vermijd overbodige taal en concentreer je op kritische aspecten.
-          Vertrouw strikt op de aangeleverde tekst, zonder externe informatie.
-          Maak de samenvatting op in alineavorm voor een gemakkelijk begrip.
-          Gebruik titels en bulletpoints om het overzichtelijk te houden. Wanneer je een titel maakt gebruik dan de tag <b>titel</b>. 
-          Een goede lengte voor een samenvatting is de helft van de originele transcriptie. 
-          Daarnaast wil ik ook een aparte kop voor actiepunten die benoemd zijn in het transcript.
-          Daarnaast wil ik alle vragen die gesteld zijn en de daarbij behorende antwoorden in een aparte kop genaamd qna.
-          Geef de output in JSON met de volgende keys:
-          {
-            "summary": string,
-            "actionItems": string,
-            "qna": string
-          }
-          Transcript:
-          ${fullText}
-        `,
+Guidelines:  
+
+[ 
+
+Create a summary in the language that the text is in, that is detailed, thorough, in-depth, and complex, while maintaining clarity and conciseness. 
+The summary must cover all the key points and main ideas presented in the original text, while also condensing the information into a concise and easy-to-understand format. 
+Ensure that the summary includes relevant details and examples that support the main ideas, while avoiding any unnecessary information or repetition. 
+Rely strictly on the provided text, without including external information. 
+The length of the summary must be appropriate for the length and complexity of the original text. The length must allow to capture the main points and key details, without being overly long. A good reference point is that the summary must be around 0.4-0.6 times the length of the original text.  
+Ensure that the summary is well-organized and easy to read, with clear headings and subheadings to guide the reader through each section. Format each section in paragraph form. 
+Return it in json format with the following structure:
+{
+  "summary": string,      // samenvatting van de tekst
+  "actionItems": string,  // apart kopje met actiepunten die in de originele tekst staan
+  "qna": string           // apart kopje met alle vragen in de originele tekst en bijbehorende antwoorden
+}
+]`.trim(),
       },
     ],
     temperature: 0.5,
-  };
-
-  // Make sure you have set your OPENAI_API_KEY in environment for Next.js runtime
-  if (!process.env.OPENAI_API_KEY) {
-    throw new Error("OpenAI API key ontbreekt. Stel de OPENAI_API_KEY-omgevingsvariabele in.");
-  }
-
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-    },
-    body: JSON.stringify(payload),
   });
 
-  if (!res.ok) {
-    const err = await res.text();
-    console.error("Samenvatting mislukt:", err);
-    throw new Error("Samenvatting mislukt: " + err);
-  }
-
-  const json = await res.json();
-  const message = json.choices?.[0]?.message;
-  if (!message) {
-    throw new Error("Geen geldig antwoord van samenvatting API.");
+  const msg = completion.choices?.[0]?.message;
+  if (!msg) {
+    throw new Error("Geen geldig antwoord van Grok.");
   }
 
   let data: any;
-  if (message.function_call) {
-    const args = message.function_call.arguments;
-    data = typeof args === "string" ? JSON.parse(args) : args;
-  } else {
-    let content = String(message.content).trim();
-    content = content.replace(/^```(?:json)?\s*/, "").replace(/```$/, "");
-    try {
-      data = JSON.parse(content);
-    } catch (err) {
-      throw new Error("Kon niet parsen na strippen:\n" + content);
+  try {
+    if (msg.function_call) {
+      const args = msg.function_call.arguments;
+      data = typeof args === "string" ? JSON.parse(args) : args;
+    } else {
+      let txt = msg.content?.trim() || '';
+      txt = txt.replace(/^```(?:json)?\s*/, "").replace(/```$/, "");
+      data = JSON.parse(txt);
     }
+  } catch (err) {
+    console.error("JSON parse error:", err, "raw:", msg.content);
+    throw new Error("Kon niet parsen van Grok-antwoord.");
   }
 
   return {
@@ -142,46 +130,36 @@ async function summarizeTranscript(
 
 export async function POST(request: NextRequest) {
   try {
-    // 1) We expect a multipart/form-data POST containing one or more fields "audioFile"
     const formData = await request.formData();
-    const rawFiles = formData.getAll("audioFile");
-    const chunks: File[] = rawFiles.filter((f) => f instanceof File) as File[];
 
-    if (chunks.length === 0) {
+    // debug: print every key + value
+    for (const [key, value] of formData.entries()) {
+      console.log("[transcribe] form field:", key, value);
+    }
+    const file = formData.get("audioFile");
+    console.log(file);
+    if (!(file instanceof File)) {
       return NextResponse.json(
-        { error: "Geen audioFile chunk(s) gevonden." },
+        { error: "Geen audioFile gevonden in de upload." },
         { status: 400 }
       );
     }
 
-    // 2) Sequentially send each chunk to the Azure Function
-    const transcripts: string[] = [];
-    for (const chunk of chunks) {
-      const text = await transcribeViaAzure(chunk);
-      transcripts.push(text);
-    }
-    console.log(transcripts);
+    // 1) Send the single file to Azure for transcription
+    const fullText = await transcribeViaAzure(file);
 
-    // 3) Combine all received transcripts into one full text
-    const fullText = transcripts.join("\n").trim();
+    // 2) Summarize via Grok
+    const detectedLang = "nl"; // of detecteer dynamisch
+    const { summary, actionItems, qna } = await summarizeTranscript(fullText, detectedLang);
 
-    // 4) If summarization is requested, run summarizeTranscript()
-    let summary = "";
-    let actionItems = "";
-    let qna = "";
-    
-      // If you need a detected language, you can either hardcode "nl"/"en" 
-      // or add a client‐side languageDetection step. For now, we’ll default to "nl".
-      const detectedLang = "nl"; 
-      const parsed = await summarizeTranscript(fullText, detectedLang);
-      summary = parsed.summary;
-      actionItems = parsed.actionItems;
-      qna = parsed.qna;
-    
-
-    // 5) Return JSON with the combined transcript and optional summary
+    // 3) Return transcript + summary
     return NextResponse.json(
-      { text: fullText, summary, actionItems, qna },
+      {
+        text: fullText,
+        summary,
+        actionItems,
+        qna,
+      },
       { status: 200 }
     );
   } catch (err: any) {

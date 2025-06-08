@@ -7,6 +7,7 @@ import { stopwords } from "./stopwords"; // adjust path as needed
 import Sidebar, { Transcript } from "../components/Sidebar";
 import { useSession } from "next-auth/react";
 import ResultsSection from "@/components/ResultsSection";
+import Swal from 'sweetalert2';
 
 interface TranscribeResponse {
   text: string;
@@ -60,8 +61,9 @@ export default function Home() {
   async function handleSave() {
     if (!session) return;           // extra guard
     setSaving(true);
+  
     try {
-      const res = await fetch("/api/transcipts", {
+      const res = await fetch("/api/transcripts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -72,21 +74,38 @@ export default function Home() {
           qna,
         }),
       });
-      if (!res.ok) throw new Error(await res.text());
-      alert("Transcript saved successfully!");
-      // optionally re-fetch `transcripts` list here
+  
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text);
+      }
+  
+      await Swal.fire({
+        icon: "success",
+        title: "Saved!",
+        text: "Transcript saved successfully.",
+        timer: 2000,
+        showConfirmButton: false,
+      });
+  
+      // optionally re-fetch your transcripts list here
     } catch (err: any) {
       console.error("Save failed:", err);
-      alert("Failed to save transcript: " + err.message);
+      await Swal.fire({
+        icon: "error",
+        title: "Save failed",
+        text: err.message || "Er is iets misgegaan.",
+      });
     } finally {
       setSaving(false);
     }
   }
+  
 
   
   useEffect(() => {
     if (session) {
-      fetch("/api/transcipts")
+      fetch("/api/transcripts")
         .then((res) => {
           if (!res.ok) throw new Error("transcrive");
           return res.json();
@@ -281,6 +300,9 @@ Speaker 2: We willen vooral focussen op AI-integraties en performanceoptimalisat
   
       // 2) FormData & API-call
       const form = new FormData();
+      form.append("audioFile", file, file.name);
+
+      setSummarization(true);
       form.append("enableSummarization", summarization ? "true" : "false");
   
       const response = await fetch("/api/transcribe", {
@@ -413,7 +435,7 @@ Speaker 2: We willen vooral focussen op AI-integraties en performanceoptimalisat
 <div className="flex h-screen">
 
 {<Sidebar transcripts={transcripts} />}
-<div className="flex-1">
+<div className="flex-1 overflow-y-auto">
 
       <div className="container mx-auto px-4 py-12 max-w-4xl">
 

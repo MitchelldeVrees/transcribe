@@ -16,7 +16,7 @@ export default function TranscriptsLayout({
   // fetch list of transcripts once
   useEffect(() => {
     if (session) {
-      fetch("/api/transcipts")
+      fetch("/api/transcripts")
         .then((res) => {
           if (!res.ok) throw new Error("Kon transcripties niet laden");
           return res.json();
