@@ -1,17 +1,10 @@
-import NextAuth, { type NextAuthOptions } from 'next-auth';
-import GoogleProvider from 'next-auth/providers/google';
+// app/api/auth/[...nextauth]/route.ts
 
-export const authOptions: NextAuthOptions = {
-  providers: [
-    GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-    }),
-  ],
-  secret: process.env.NEXTAUTH_SECRET!,
-};
+import NextAuth from "next-auth";
+import { authOptions } from "@/lib/auth";
 
+// NextAuth handler
 const handler = NextAuth(authOptions);
 
-// In the new App Router style you export the handler for each HTTP verb:
+// Export it under the two HTTP verbs NextAuth uses:
 export { handler as GET, handler as POST };

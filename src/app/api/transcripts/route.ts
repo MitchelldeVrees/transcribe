@@ -3,7 +3,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import { getTursoClient } from '@/lib/turso';
 
-export const runtime = 'edge';
 const { TURSO_AUTH_TOKEN, NEXTAUTH_SECRET } = process.env;
 
 export async function GET(req: NextRequest) {

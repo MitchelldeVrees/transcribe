@@ -305,19 +305,22 @@ Speaker 2: We willen vooral focussen op AI-integraties en performanceoptimalisat
       setSummarization(true);
       form.append("enableSummarization", summarization ? "true" : "false");
   
-      const response = await fetch("/api/transcribe", {
-        method: "POST",
-        body: form,
-      });
+      const response = await fetch("/api/transcribe", { method: "POST", body: form });
+        const contentType = response.headers.get("content-type") || "";
+        const text   = await response.text();          // always grab raw
+        if (!response.ok) {
+          console.error("API error:", text);
+          throw new Error(text);
+          
+        }
+        if (!contentType.includes("application/json")) {
+          console.error("Expected JSON but got:", text);
+          throw new Error("Ongeldig antwoord van de server.");
+        }
+        const data = JSON.parse(text);  // now safe to parse
+
   
-      if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.error || "Transcription failed");
-      }
-  
-      // 3) Typen van de JSON-response
-      const data = (await response.json()) as TranscribeResponse;
-  
+
       // 4) Zet transcript en samenvatting
       setTranscript(data.text);
       setSummary(data.summary ?? "");
