@@ -10,6 +10,7 @@ export async function GET(req: NextRequest) {
     console.log("Inside transcipts requesst")
   // 1. Authenticate
   const token = await getToken({ req, secret: NEXTAUTH_SECRET });
+  console.log(token);
   if (!token?.email) {
     return NextResponse.json(
       { error: 'Not authenticated' },
@@ -18,33 +19,33 @@ export async function GET(req: NextRequest) {
   }
   const email = token.email as string;
   const name = token.name as string ;
+  const subId = token.sub as string;
   console.log("Token: ", email);
   const db = getTursoClient();
 
   // 2. Ensure the user exists (upsert by email)
   // First try to read the user
   const userRes = await db.execute(
-    'SELECT id FROM users WHERE email = ?',
-    [email]
+    'SELECT id FROM users WHERE subId = ?',
+    [subId]
   );
   let userId: string;
   if (userRes.rows.length > 0) {
     userId = userRes.rows[0].id as string;
   } else {
     // generate a UUID for Turso (Edge runtime has crypto.randomUUID)
-    userId = crypto.randomUUID(); 
     const today = new Date().toISOString().split('T')[0]; // e.g. "2025-05-22"
 
     await db.execute(
-      'INSERT INTO users (email, name,created) VALUES (?, ?,?)',
-      [email, name, today ?? null]
+      'INSERT INTO users (email, name,created, subId) VALUES (?, ?,?,?)',
+      [email, name, today ?? null, subId]
     );
   }
 
   const userIdTranscripts = await db.execute(
     `SELECT id
-       FROM users WHERE email = ?`,
-    [email]
+       FROM users WHERE subId = ?`,
+    [subId]
     
   );
   console.log(userIdTranscripts.rows[0].id);
@@ -58,7 +59,7 @@ export async function GET(req: NextRequest) {
 
 
   return NextResponse.json({
-    user: { id: userId, email, name },
+    user: { id: subId, email, name },
     transcripts: txRes.rows
   });
 }
