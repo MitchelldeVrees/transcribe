@@ -18,7 +18,7 @@ export default function TranscriptsLayout({
     if (session) {
       fetch("/api/transcripts")
         .then((res) => {
-          if (!res.ok) throw new Error("Kon transcripties niet laden");
+          if (!res.ok) throw new Error("Kon notulen niet laden");
           return res.json();
         })
         .then((data) => setTranscripts(data.transcripts))

@@ -34,7 +34,7 @@ export default function Sidebar({ transcripts }: SidebarProps) {
       {!session && (
         <div className="p-4 border-b border-blue-700">
           <p className="text-sm text-blue-200 mb-2">
-            Log in om je transcriptie te bekijken en op te slaan.
+            Log in om je notules te bekijken en op te slaan.
           </p>
           <button
             onClick={() => handleSignIn()}
@@ -50,7 +50,7 @@ export default function Sidebar({ transcripts }: SidebarProps) {
         <div className="p-4 border-b border-blue-700">
           <h2 className="font-medium flex items-center">
             <i className="fas fa-history mr-2"></i>
-            Recente Transcriptie
+            Recente notulen
           </h2>
         </div>
 
@@ -87,9 +87,17 @@ export default function Sidebar({ transcripts }: SidebarProps) {
             )
           ) : (
             <div className="p-4 text-blue-300 italic">
-              Log in om deze transcriptie te bekijken.
+              Log in om deze notulen te bekijken.
             </div>
           )}
+          <div className="p-4">
+      <Link
+        href="/"
+        className="inline-block text-sm text-blue-200 hover:text-white font-semibold"
+      >
+        Maak een nieuwe notulen +
+      </Link>
+    </div>
         </div>
       </div>
 

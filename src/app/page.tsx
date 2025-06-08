@@ -161,14 +161,14 @@ export default function Home() {
 // file.size is in bytes
     const sizeMBNoRound = selectedFile.size / (1024 * 1024);
 
-    if (sizeMBNoRound < 10) {
-      setEstimatedSec(20);    // small files: ~20s
+    if (sizeMBNoRound < 30) {
+      setEstimatedSec(60);    // small files: ~20s
     } else if (sizeMBNoRound < 50) {
-      setEstimatedSec(45);    // medium: ~45s
+      setEstimatedSec(90);    // medium: ~45s
     } else if (sizeMBNoRound < 100) {
-      setEstimatedSec(110);    // large: ~90s
+      setEstimatedSec(200);    // large: ~90s
     } else {
-      setEstimatedSec(140);   // very large: ~2m
+      setEstimatedSec(260);   // very large: ~2m
     }
 
     setFileSizeMB(sizeMB);
@@ -311,7 +311,7 @@ Speaker 2: We willen vooral focussen op AI-integraties en performanceoptimalisat
         if (!response.ok) {
           console.error("API error:", text);
           throw new Error(text);
-          
+
         }
         if (!contentType.includes("application/json")) {
           console.error("Expected JSON but got:", text);
@@ -815,7 +815,7 @@ Speaker 2: We willen vooral focussen op AI-integraties en performanceoptimalisat
                   onClick={handleNewTranscription}
                   className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200 flex items-center mx-auto"
                 >
-                  <i className="fas fa-redo mr-2"></i> Begin nieuwe transcriptie
+                  <i className="fas fa-redo mr-2"></i> Begin nieuwe notulen
                 </button>
               </div>
             </div>
