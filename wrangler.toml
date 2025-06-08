@@ -17,5 +17,3 @@ upload_source_maps = true
 [observability]
   enabled = true
 
-[[plugins]]
-  package = "@opennextjs/cloudflare"

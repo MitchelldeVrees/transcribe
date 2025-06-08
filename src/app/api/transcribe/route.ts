@@ -1,4 +1,6 @@
 // app/api/transcribe/route.ts
+// export const runtime = "edge";
+
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 

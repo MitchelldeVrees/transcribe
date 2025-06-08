@@ -31,7 +31,7 @@
     "lz-string": "^1.5.0",
     "next": "^15.3.0",
     "next-auth": "^4.24.11",
-    "openai": "^4.104.0",
+    "openai": "^5.0.0-beta.0",
     "p-limit": "^6.2.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
@@ -41,7 +41,6 @@
     "uuid": "^11.1.0"
   },
   "devDependencies": {
-    "@cloudflare/next-on-pages": "^1.13.12",
     "@opennextjs/cloudflare": "^1.0.0-beta.3",
     "@tailwindcss/postcss": "^4.1.4",
     "@types/archiver": "^6.0.3",
@@ -63,8 +62,6 @@
     "build": "next build",
     "cf-build": "npx opennextjs-cloudflare build",
     "cf-deploy": "npx opennextjs-cloudflare deploy",
-    "deploy": "npm run cf-build && npm run cf-deploy",
-    "upload-secrets": "node src/scripts/upload-secrets.js",
-    "publish": "npm run upload-secrets && npm run cf-build && npm run cf-deploy"
+    "deploy": "npm run cf-build && npm run cf-deploy"
   }
 }
