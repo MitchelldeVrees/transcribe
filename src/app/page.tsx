@@ -4,10 +4,10 @@ import React, { useState, useRef, useEffect } from "react";
 import { saveAs } from "file-saver";
 import { Document, Packer, Paragraph, TextRun } from "docx";
 import { stopwords } from "./stopwords"; // adjust path as needed
-import { loadFFmpeg, splitAudioFile } from "../lib/ffmpegHelper";
 import Sidebar, { Transcript } from "../components/Sidebar";
 import { useSession } from "next-auth/react";
 import ResultsSection from "@/components/ResultsSection";
+import Swal from 'sweetalert2';
 
 interface TranscribeResponse {
   text: string;
@@ -47,13 +47,11 @@ export default function Home() {
   const [estimatedSec, setEstimatedSec] = useState(0);
   // At the top with your other states
   const [speakersTranscript, setSpeakersTranscript] = useState("");
-  const [ready, setReady] = useState(false);
 
 
   const [ffmpegLoaded, setFfmpegLoaded] = useState(false);
 
   // New state: transcription model choice ("assembly" or "openai")
-  const [model, setModel] = useState<"assembly" | "openai">("assembly");
   // New state: summarization enabled (true/false)
   const [summarization, setSummarization] = useState<boolean>(false);
 
@@ -63,8 +61,9 @@ export default function Home() {
   async function handleSave() {
     if (!session) return;           // extra guard
     setSaving(true);
+  
     try {
-      const res = await fetch("/api/transcipts", {
+      const res = await fetch("/api/transcripts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -75,21 +74,38 @@ export default function Home() {
           qna,
         }),
       });
-      if (!res.ok) throw new Error(await res.text());
-      alert("Transcript saved successfully!");
-      // optionally re-fetch `transcripts` list here
+  
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text);
+      }
+  
+      await Swal.fire({
+        icon: "success",
+        title: "Saved!",
+        text: "Transcript saved successfully.",
+        timer: 2000,
+        showConfirmButton: false,
+      });
+  
+      // optionally re-fetch your transcripts list here
     } catch (err: any) {
       console.error("Save failed:", err);
-      alert("Failed to save transcript: " + err.message);
+      await Swal.fire({
+        icon: "error",
+        title: "Save failed",
+        text: err.message || "Er is iets misgegaan.",
+      });
     } finally {
       setSaving(false);
     }
   }
+  
 
   
   useEffect(() => {
     if (session) {
-      fetch("/api/transcipts")
+      fetch("/api/transcripts")
         .then((res) => {
           if (!res.ok) throw new Error("transcrive");
           return res.json();
@@ -107,17 +123,7 @@ export default function Home() {
     }
   };
 
-  useEffect(() => {
-    fetch('/api/account')
-      .then((res) => {
-        if (!res.ok) throw new Error('Network response was not ok')
-        return res.json()
-      })
-      .then((data) => setTranscripts(data.transcripts))
-      .catch((err) => setError(err.message))
-
-  }, [])
-
+  
   useEffect(() => {
     // whenever we enter "loading", start fresh
     if (stage === "loading") {
@@ -144,12 +150,6 @@ export default function Home() {
     };
   }, [stage, estimatedSec]);
 
-  useEffect(() => {
-    (async () => {
-      await loadFFmpeg();
-      setReady(true);
-    })();
-  }, []);
 
   // Process selected file
   const handleFiles = (files: FileList) => {
@@ -200,6 +200,59 @@ export default function Home() {
     }
   };
 
+  // --- add this inside your Home() component ---
+const handleDemo = () => {
+  // set up top‐metrics
+  setAudioDuration("3:24");
+  setWordCount(472);
+  setProcessingTime(45);
+
+  // a multi-paragraph transcript sample
+  setTranscript(
+    `Welkom bij onze demo van Audio Transcriber.  
+In deze demo zie je hoe een langer gesprek wordt omgezet in tekst.  
+
+Gastspreker 1: “Vandaag bespreken we de roadmap voor Q3…”  
+Gastspreker 2: “We willen vooral focussen op…”  
+
+En zo biedt deze tool je direct bruikbare output.`
+  );
+
+  // a concise summary
+  setSummary(
+    `• Doel: Roadmap Q3  
+• Focus: AI-integraties en performanceoptimalisatie  
+• Volgende stappen: team kick-off, API-design workshop`
+  );
+
+  // action items
+  setActionItems(
+    `- Plan kick-off meeting voor AI-integratie (deadline: 25 juni)  
+- Opstellen API-design document (verantwoordelijke: Els)  
+- Set up performance benchmark omgeving`
+  );
+
+  // optional: speaker-tagged transcript
+  setSpeakersTranscript(
+    `Speaker 1: Vandaag bespreken we de roadmap voor Q3.  
+Speaker 2: We willen vooral focussen op AI-integraties en performanceoptimalisatie.`
+  );
+
+  // example word frequencies
+  setWordFrequencies([
+    { word: "roadmap", count: 4 },
+    { word: "AI-integratie", count: 3 },
+    { word: "performance", count: 2 },
+    { word: "demo", count: 2 },
+    { word: "team", count: 1 },
+    // …add a few more if you like…
+  ]);
+
+  // show the results panel
+  setStage("results");
+};
+
+
   const exportToWord = async () => {
     if (!transcript) {
       alert("Er is geen transcript beschikbaar.");
@@ -244,11 +297,12 @@ export default function Home() {
     
     try {
       // 1) Split audio en chunk-files
-      const chunks = await splitAudioFile(file, 20 * 60);
   
       // 2) FormData & API-call
       const form = new FormData();
-      chunks.forEach((chunk) => form.append("audioFile", chunk));
+      form.append("audioFile", file, file.name);
+
+      setSummarization(true);
       form.append("enableSummarization", summarization ? "true" : "false");
   
       const response = await fetch("/api/transcribe", {
@@ -381,7 +435,7 @@ export default function Home() {
 <div className="flex h-screen">
 
 {<Sidebar transcripts={transcripts} />}
-<div className="flex-1">
+<div className="flex-1 overflow-y-auto">
 
       <div className="container mx-auto px-4 py-12 max-w-4xl">
 
@@ -398,45 +452,7 @@ export default function Home() {
           </p>
         </div>
   {/* Transcription Model Dropdown */}
-  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-start gap-6 mb-6">
-  {/* Transcription Model Dropdown */}
-  <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full sm:w-auto">
-    <label htmlFor="model" className="font-medium text-gray-700 whitespace-nowrap">
-      Transcriptie Model:
-    </label>
-    <select
-      id="model"
-      value={model}
-      onChange={(e) => {
-        const selected = e.target.value as "assembly" | "openai";
-        setModel(selected);
-        if (selected === "assembly") {
-          setSummarization(false);
-        }
-      }}
-      className="block w-full sm:w-auto px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-    >
-      <option value="assembly">V1</option>
-      <option value="openai">V2</option>
-    </select>
-  </div>
-  <input type="hidden" name="debug" value="true" />
-
-  {/* Summarization Toggle */}
-  <div className="flex items-center gap-3">
-    <input
-      type="checkbox"
-      id="summarization"
-      checked={summarization}
-      onChange={(e) => setSummarization(e.target.checked)}
-      disabled={model === "assembly"}
-      className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-    />
-    <label htmlFor="summarization" className="font-medium text-gray-700 select-none">
-      Samenvatting
-    </label>
-  </div>
-</div>
+  
    
         <div className="bg-white rounded-xl shadow-lg overflow-hidden mb-8 transition-all duration-300">
           {stage === "upload" && (
@@ -459,7 +475,7 @@ export default function Home() {
                 <input
                   type="file"
                   id="audio-upload"
-                  accept=".mp3,.mp4,.mpeg,.mpga,.m4a,.wav,.webm"
+                  accept="audio/mpeg,audio/mp4,audio/wav,video/mp4,video/webm"
                   className="hidden"
                   onChange={handleFileChange}
                 />
@@ -497,6 +513,7 @@ export default function Home() {
                     >
                       <i className="fas fa-keyboard mr-2"></i> Transcribe
                     </button>
+              
                   </div>
 
                   <div className="audio-visualizer mb-4">
