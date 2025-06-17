@@ -71,12 +71,39 @@ async function summarizeTranscript(
     model: "grok-3-mini",
     messages: [
       { role: "system", content: "Je bent een transcript-samenvatter die alleen JSON retourneert." },
-      { role: "user", content: `
-%${fullText}%
-Act as a professional summarizer. Create a concise and comprehensive summary of the text enclosed in %% above, while adhering to the guidelines in [ ] below.
-[ ... guidelines omitted for brevity ... ]
-Return JSON with {"summary": string, "actionItems": string, "qna": string}.
-`.trim() },
+      {
+        role: "user",
+        content: `
+          %${fullText}%
+                  Act as a professional summarizer. Create a concise and comprehensive summary of the text enclosed in %% above, while adhering to the guidelines enclosed in [ ] below. 
+
+          Guidelines:  
+
+          [ 
+
+          Create a summary in the language that the text is in, that is detailed, thorough, in-depth, and complex, while maintaining clarity and conciseness. 
+          The summary must cover all the key points and main ideas presented in the original text, while also condensing the information into a concise and easy-to-understand format. 
+          Ensure that the summary includes relevant details and examples that support the main ideas, while avoiding any unnecessary information or repetition. 
+          Rely strictly on the provided text, without including external information. 
+          The length of the summary must be appropriate for the length and complexity of the original text. The length must allow to capture the main points and key details, without being overly long. A good reference point is that the summary must be around 0.4-0.6 times the length of the original text.  
+          Ensure that the summary is well-organized and easy to read, with clear headings and subheadings to guide the reader through each section. Format each section in paragraph form.
+          Give an array "qna" with all questions and their answers. Each element must have the exact format
+
+          [
+            {
+              "question": "The full question here",
+              "answer": "The full answer here"
+            },
+            …
+          ]
+          Return it in json format with the following structure:
+          {
+            "summary": string,      // Summary of the text in the same language as the text
+            "actionItems": string,  // A separate section with action items that are present in the original text
+            "qna": string           // apart kopje met alle vragen in de originele tekst en bijbehorende antwoorden
+          }
+          ]`.trim(),
+      },
     ],
     temperature: 0.5,
   });
