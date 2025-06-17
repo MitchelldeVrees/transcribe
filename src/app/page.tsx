@@ -9,16 +9,16 @@ import ResultsSection from "@/components/ResultsSection";
 import Swal from 'sweetalert2';
 import { useUser, useClerk, SignedOut, SignedIn } from "@clerk/nextjs";
 
-interface TranscribeResponse {
-  text: string;
-  summary?: string;
-  actionItems?: string;
-  qna?: string;
-}
-
 interface QnaItem {
   question: string;
-  answer: string;
+  answer:   string;
+}
+
+interface TranscribeResponse {
+  text:        string;
+  summary?:    string;
+  actionItems?:string;
+  qna?:        QnaItem[];   // ← now qna really is an array of {question,answer}
 }
 
 
@@ -203,56 +203,7 @@ export default function Home() {
   };
 
   // --- add this inside your Home() component ---
-const handleDemo = () => {
-  // set up top‐metrics
-  setAudioDuration("3:24");
-  setWordCount(472);
-  setProcessingTime(45);
 
-  // a multi-paragraph transcript sample
-  setTranscript(
-    `Welkom bij onze demo van Audio Transcriber.  
-In deze demo zie je hoe een langer gesprek wordt omgezet in tekst.  
-
-Gastspreker 1: “Vandaag bespreken we de roadmap voor Q3…”  
-Gastspreker 2: “We willen vooral focussen op…”  
-
-En zo biedt deze tool je direct bruikbare output.`
-  );
-
-  // a concise summary
-  setSummary(
-    `• Doel: Roadmap Q3  
-• Focus: AI-integraties en performanceoptimalisatie  
-• Volgende stappen: team kick-off, API-design workshop`
-  );
-
-  // action items
-  setActionItems(
-    `- Plan kick-off meeting voor AI-integratie (deadline: 25 juni)  
-- Opstellen API-design document (verantwoordelijke: Els)  
-- Set up performance benchmark omgeving`
-  );
-
-  // optional: speaker-tagged transcript
-  setSpeakersTranscript(
-    `Speaker 1: Vandaag bespreken we de roadmap voor Q3.  
-Speaker 2: We willen vooral focussen op AI-integraties en performanceoptimalisatie.`
-  );
-
-  // example word frequencies
-  setWordFrequencies([
-    { word: "roadmap", count: 4 },
-    { word: "AI-integratie", count: 3 },
-    { word: "performance", count: 2 },
-    { word: "demo", count: 2 },
-    { word: "team", count: 1 },
-    // …add a few more if you like…
-  ]);
-
-  // show the results panel
-  setStage("results");
-};
 
 
   const exportToWord = async () => {
@@ -330,8 +281,12 @@ Speaker 2: We willen vooral focussen op AI-integraties en performanceoptimalisat
       setTranscript(data.text);
       setSummary(data.summary ?? "");
       setActionItems(data.actionItems ?? "");
-      console.log(data.qna);
-      setQna(Array.isArray(data.qna) ? data.qna : []);
+      const parsedQna = Array.isArray(data.qna)
+      ? data.qna
+      : typeof data.qna === "string"
+        ? JSON.parse(data.qna)
+        : [];
+      setQna(parsedQna);
       console.log("QNA");
       console.log(qna);
       // 5) Meet en zet verwerkingstijd
@@ -602,217 +557,22 @@ Speaker 2: We willen vooral focussen op AI-integraties en performanceoptimalisat
   </button>
 </div>
 
-              <div className="p-6">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                  <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
-                    <div className="flex items-center">
-                      <div className="p-3 rounded-full bg-blue-100 text-blue-600 mr-4">
-                        <i className="fas fa-clock text-xl"></i>
-                      </div>
-                      <div>
-                        <p className="text-sm text-gray-500">Lengte</p>
-                        <p id="duration-metric" className="text-lg font-semibold">
-                          {audioDuration}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
-                    <div className="flex items-center">
-                      <div className="p-3 rounded-full bg-green-100 text-green-600 mr-4">
-                        <i className="fas fa-font text-xl"></i>
-                      </div>
-                      <div>
-                        <p className="text-sm text-gray-500">Woord aantal</p>
-                        <p id="word-count" className="text-lg font-semibold">
-                          {wordCount}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
-                    <div className="flex items-center">
-                      <div className="p-3 rounded-full bg-purple-100 text-purple-600 mr-4">
-                        <i className="fas fa-bolt text-xl"></i>
-                      </div>
-                      <div>
-                        <p className="text-sm text-gray-500">Process tijd</p>
-                        <p
-                          id="processing-time"
-                          className="text-lg font-semibold text-black"
-                        >
-                          {processingTime}s
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+            <ResultsSection
+              audioDuration={audioDuration}
+              wordCount={wordCount}
+              processingTime={processingTime}
+              transcript={transcript}
+              summary={summary}
+              speakersTranscript={speakersTranscript}
+              actionItems={actionItems}
+              wordFrequencies={wordFrequencies}
+              qna={qna}
+              saving={saving}
+              handleSave={handleSave}
+              exportToWord={exportToWord}
+              handleNewTranscription={handleNewTranscription}
+            />
 
-<div className="mb-6">
-  <div className="flex justify-between items-center mb-4">
-  <h3 className="text-lg font-semibold text-gray-800">Transcript</h3>
-
-  <div className="flex items-center">
-    <button
-      id="copy-btn"
-      onClick={() => {
-        if (transcript) {
-          navigator.clipboard.writeText(transcript);
-        }
-      }}
-      className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors duration-200 flex items-center"
-    >
-      <i className="fas fa-copy mr-2"></i> Kopieer tekst
-    </button>
-
-    <button
-      onClick={exportToWord}
-      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors duration-200 flex items-center ml-2"
-    >
-      <i className="fas fa-file-word mr-2"></i> Download als Word-bestand
-    </button>
-  </div>
-</div>
-  <div
-    id="transcript-container"
-    className="bg-gray-50 border border-gray-200 rounded-lg p-4 max-h-96 overflow-y-auto text-gray-800"
-  >
-    {transcript.split("\n\n").map(
-      (line, idx) =>
-        line.trim() && (
-          <div key={idx} className="transcript-line mb-3 p-2 rounded-lg">
-            {line}
-          </div>
-        )
-    )}
-  </div>
-</div>
-
-{summary && (
-  <div className="mb-6">
-    <div className="flex justify-between items-center mb-4">
-      <h3 className="text-lg font-semibold text-gray-800">Summary</h3>
-      <button
-        id="copy-summary-btn"
-        onClick={() => {
-          if (summary) {
-            navigator.clipboard.writeText(summary);
-          }
-        }}
-        className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors duration-200 flex items-center"
-      >
-        <i className="fas fa-copy mr-2"></i> Kopieer samenvatting
-      </button>
-    </div>
-    <div
-      id="summary-container"
-      className="bg-gray-50 border border-gray-200 rounded-lg p-4 max-h-96 overflow-y-auto text-gray-800"
-    >
-      {summary.split("\n\n").map(
-        (line, idx) =>
-          line.trim() && (
-            <div key={idx} className="summary-line mb-3 p-2 rounded-lg">
-              {line}
-            </div>
-          )
-      )}
-    </div>
-  </div>
-)}
-{speakersTranscript && (
-  <div className="mb-6">
-    <div className="flex justify-between items-center mb-4">
-      <h3 className="text-lg font-semibold text-gray-800">Sprekers Transcript</h3>
-      <button
-        onClick={() => {
-          navigator.clipboard.writeText(speakersTranscript);
-        }}
-        className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors duration-200 flex items-center"
-      >
-        <i className="fas fa-copy mr-2"></i> Kopieer sprekers transcript
-      </button>
-    </div>
-    <div
-      id="speakers-container"
-      className="bg-gray-50 border border-gray-200 rounded-lg p-4 max-h-96 overflow-y-auto text-gray-800 whitespace-pre-wrap"
-    >
-      {speakersTranscript}
-    </div>
-  </div>
-)}
-
-{actionItems && (
-  <div className="mb-6">
-    <div className="flex justify-between items-center mb-4">
-      <h3 className="text-lg font-semibold text-gray-800">Actiepunten & Taken</h3>
-      <button
-        onClick={() => {
-          navigator.clipboard.writeText(actionItems);
-        }}
-        className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors duration-200 flex items-center"
-      >
-        <i className="fas fa-copy mr-2"></i> Kopieer actiepunten
-      </button>
-    </div>
-    <div
-      id="action-items-container"
-      className="bg-gray-50 border border-gray-200 rounded-lg p-4 max-h-96 overflow-y-auto text-gray-800"
-    >
-      {actionItems.split("\n").map((line, idx) =>
-        line.trim() ? (
-          <div key={idx} className="action-item-line mb-3 p-2 rounded-lg">
-            {line}
-          </div>
-        ) : null
-      )}
-    </div>
-  </div>
-)}
-
-{qna.length > 0 && (
-  <div className="mb-6">
-    <div className="flex justify-between items-center mb-4">
-      <h3 className="text-lg font-semibold text-gray-800">Q&A</h3>
-      <button
-        onClick={() => navigator.clipboard.writeText(
-          qna.map(({question, answer}) => `${question}\n${answer}`).join("\n\n")
-        )}
-        className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors duration-200 flex items-center"
-      >
-        <i className="fas fa-copy mr-2"></i> Kopieer Q&A
-      </button>
-    </div>
-    <div
-      id="qna-container"
-      className="bg-gray-50 border border-gray-200 rounded-lg p-4 max-h-96 overflow-y-auto text-gray-800"
-    >
-      {qna.map(({ question, answer }, idx) => (
-        <div key={idx} className="mb-4">
-          <p className="font-medium">{`${idx + 1}. ${question}`}</p>
-          <p className="pl-4">{answer}</p>
-        </div>
-      ))}
-    </div>
-  </div>
-)}
-
-
-<div className="bg-blue-50 border border-blue-100 rounded-lg p-4">
-  <h3 className="text-lg font-semibold text-blue-800 mb-3 flex items-center">
-    <i className="fas fa-chart-pie mr-2"></i> Woord frequentie
-  </h3>
-  <div id="word-frequency" className="flex flex-wrap gap-2">
-    {wordFrequencies.map((item) => (
-      <span
-        key={item.word}
-        className="px-3 py-1 bg-white rounded-full text-sm shadow-sm flex items-center"
-      >
-        {item.word} <span className="ml-1 text-blue-600 font-medium">{item.count}</span>
-      </span>
-    ))}
-  </div>
-</div>
-              </div>
               
               <div className="border-t border-gray-200 p-6 bg-gray-50">
                 <button
