@@ -2,10 +2,9 @@
 "use client";
 
 import React from "react";
-import type { Session } from "next-auth";
 
 interface WordFreq { word: string; count: number; }
-
+interface QnaItem  { question: string; answer: string; }
 interface ResultsSectionProps {
   audioDuration: string;
   wordCount: number;
@@ -15,8 +14,8 @@ interface ResultsSectionProps {
   speakersTranscript: string;
   actionItems: string;
   wordFrequencies: WordFreq[];
+  qna: QnaItem[];
   saving: boolean;
-  session: Session | null;
   handleSave: () => void;
   exportToWord: () => void;
   handleNewTranscription: () => void;
@@ -31,8 +30,8 @@ export default function ResultsSection({
   speakersTranscript,
   actionItems,
   wordFrequencies,
+  qna,
   saving,
-  session,
   handleSave,
   exportToWord,
   handleNewTranscription,
@@ -197,9 +196,52 @@ export default function ResultsSection({
                   </div>
                 ) : null
               )}
+
+              
             </div>
           </div>
         )}
+
+
+        {/* Q&A */}
+{qna.length > 0 && (
+  <div className="mb-6">
+    <div className="flex justify-between items-center mb-4">
+      <h3 className="text-lg font-semibold text-gray-800">
+        Vragen & Antwoorden
+      </h3>
+      <button
+        onClick={() =>
+          navigator.clipboard.writeText(
+            qna
+              .map(
+                (item) =>
+                  `Vraag: ${item.question}\nAntwoord: ${item.answer}`
+              )
+              .join("\n\n")
+          )
+        }
+        className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors duration-200 flex items-center"
+      >
+        <i className="fas fa-copy mr-2"></i> Kopieer Q&A
+      </button>
+    </div>
+    <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 max-h-96 overflow-y-auto text-gray-800">
+      {qna.map((item, idx) => (
+        <div
+          key={idx}
+          className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm mb-4"
+        >
+          <p className="font-medium text-blue-900 mb-1">Vraag</p>
+          <p className="mb-2">{item.question}</p>
+          <p className="font-medium text-green-900 mb-1">Antwoord</p>
+          <p>{item.answer}</p>
+        </div>
+      ))}
+    </div>
+  </div>
+)}
+
 
         {/* Word Frequency */}
         <div className="bg-blue-50 border border-blue-100 rounded-lg p-4">

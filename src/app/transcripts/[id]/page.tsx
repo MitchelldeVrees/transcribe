@@ -2,12 +2,12 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useParams }                    from "next/navigation";
-import { useSession }                   from "next-auth/react";
-import useSWR                            from "swr";
-import Sidebar, { Transcript }          from "@/components/Sidebar";
-import ResultsSection                   from "@/components/ResultsSection";
-import { stopwords }                    from "../../stopwords";
+import { useParams } from "next/navigation";
+import useSWR from "swr";
+import Sidebar, { Transcript } from "@/components/Sidebar";
+import ResultsSection from "@/components/ResultsSection";
+import { stopwords } from "../../stopwords";
+import { useUser } from "@clerk/nextjs";
 
 const fetcher = (url: string) => fetch(url).then((r) => {
   if (!r.ok) throw new Error(`Fetch error ${r.status}`);
@@ -28,7 +28,7 @@ interface TranscriptDetail {
 
 export default function TranscriptPage() {
   const { id } = useParams();
-  const { data: session } = useSession();
+  const { user, isSignedIn } = useUser();
   const MAX_TITLE_LENGTH = 50;
 
   // --- 1) SWR for sidebar list ---
@@ -37,7 +37,7 @@ export default function TranscriptPage() {
     isLoading: listLoading,
     error: listError,
     mutate: mutateList
-  } = useSWR(session ? "/api/transcripts" : null, fetcher, {
+  } = useSWR(isSignedIn ? "/api/transcripts" : null, fetcher, {
     revalidateOnFocus: false,
   });
 
@@ -48,23 +48,20 @@ export default function TranscriptPage() {
     error: detailError,
     mutate: mutateDetail
   } = useSWR(
-    session && id ? `/api/transcripts/${id}` : null,
+    isSignedIn && id ? `/api/transcripts/${id}` : null,
     fetcher,
     { revalidateOnFocus: false }
   );
 
-  // Local UI state for inline editing
-  const [isEditing, setIsEditing]   = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
   const [titleInput, setTitleInput] = useState("");
 
-  // When the detail finishes loading, seed the input
   useEffect(() => {
     if (detailData?.transcript.title) {
       setTitleInput(detailData.transcript.title);
     }
   }, [detailData]);
 
-  // Compute word frequencies once we have content
   const [wordFrequencies, setWordFrequencies] = useState<
     { word: string; count: number }[]
   >([]);
@@ -87,7 +84,6 @@ export default function TranscriptPage() {
     );
   }, [detailData]);
 
-  // Inline-save handler
   async function saveTitle() {
     if (!id) return;
     try {
@@ -100,7 +96,6 @@ export default function TranscriptPage() {
         throw new Error(await res.text());
       }
 
-      // 1) Optimistically update detail panel
       mutateDetail(
         {
           transcript: { ...detailData!.transcript, title: titleInput },
@@ -108,7 +103,6 @@ export default function TranscriptPage() {
         false
       );
 
-      // 2) Optimistically update sidebar list
       mutateList(
         {
           transcripts: listData!.transcripts.map((t: Transcript) =>
@@ -125,7 +119,7 @@ export default function TranscriptPage() {
   }
 
   // Guards: auth / loading / error
-  if (!session) {
+  if (!isSignedIn) {
     return (
       <div className="flex h-screen">
         <Sidebar transcripts={[]} />
@@ -137,6 +131,7 @@ export default function TranscriptPage() {
       </div>
     );
   }
+
   if (listLoading || detailLoading) {
     return (
       <div className="flex h-screen">
@@ -147,6 +142,7 @@ export default function TranscriptPage() {
       </div>
     );
   }
+
   if (listError || detailError) {
     return (
       <div className="flex h-screen">
@@ -160,11 +156,9 @@ export default function TranscriptPage() {
     );
   }
 
-  // Destructure out the detail
   const transcript = detailData!.transcript;
   const transcripts = listData!.transcripts;
 
-  // Render
   return (
     <div className="flex h-screen">
       <Sidebar transcripts={transcripts} />
@@ -219,7 +213,7 @@ export default function TranscriptPage() {
           actionItems={transcript.actionPoints || ""}
           wordFrequencies={wordFrequencies}
           saving={false}
-          session={session}
+          qna={transcript.qna || []}
           handleSave={() => {}}
           exportToWord={() => {}}
           handleNewTranscription={() => {}}

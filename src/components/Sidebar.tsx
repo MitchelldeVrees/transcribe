@@ -3,8 +3,7 @@
 
 import React from "react";
 import Link from "next/link";
-import { useSession } from "next-auth/react";
-import { handleSignIn, handleSignOut } from "@/lib/auth";
+import { useUser, useClerk, SignedOut, SignedIn } from "@clerk/nextjs";
 
 export interface Transcript {
   id: string | number;
@@ -17,8 +16,9 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ transcripts }: SidebarProps) {
-  const { data: session, status } = useSession();
-  
+  const { user, isSignedIn } = useUser();
+  const { signOut } = useClerk();
+    
  
   return (
     <aside className="w-64 bg-blue-600 text-white flex flex-col h-full sticky top-0">
@@ -31,13 +31,13 @@ export default function Sidebar({ transcripts }: SidebarProps) {
       </div>
 
       {/* Login prompt when NOT signed in */}
-      {!session && (
+      {!isSignedIn && (
         <div className="p-4 border-b border-blue-700">
           <p className="text-sm text-blue-200 mb-2">
             Log in om je notules te bekijken en op te slaan.
           </p>
           <button
-            onClick={() => handleSignIn()}
+            onClick={() => window.location.href = "/sign-in"}
             className="w-full bg-white text-blue-800 py-2 px-4 rounded-md font-medium hover:bg-blue-700 transition-all"
           >
             <i className="fas fa-sign-in-alt mr-2"></i> Login
@@ -55,7 +55,7 @@ export default function Sidebar({ transcripts }: SidebarProps) {
         </div>
 
         <div className=" ">
-          {session ? (
+          {isSignedIn ? (
             transcripts.length > 0 ? (
               transcripts.map((t) => {
                 const idStr = String(t.id);
@@ -102,12 +102,12 @@ export default function Sidebar({ transcripts }: SidebarProps) {
       </div>
 
       {/* Account info & Sign-out when signed in */}
-      {session && (
+      {isSignedIn && (
         <div className="p-4 border-t border-blue-700 bg-blue-900">
           <div className="flex items-center">
            
             <div>
-              <div className="font-medium">{session.user?.name}</div>
+              <div className="font-medium">{user?.fullName}</div>
               <div className="text-xs text-indigo-300">Free Plan</div>
             </div>
           </div>
@@ -116,7 +116,7 @@ export default function Sidebar({ transcripts }: SidebarProps) {
               <i className="fas fa-cog mr-1"></i> 
             </button>
             <button
-              onClick={() => handleSignOut()}
+              onClick={() => signOut()}
               className="text-indigo-300 hover:text-white"
             >
               <i className="fas fa-sign-out-alt mr-1"></i> Logout
