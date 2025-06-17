@@ -2,20 +2,20 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { useSession }              from "next-auth/react";
-import Sidebar, { Transcript }     from "@/components/Sidebar";
+import { useUser } from "@clerk/nextjs";
+import Sidebar, { Transcript } from "@/components/Sidebar";
 
 export default function TranscriptsLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const { data: session } = useSession();
+  const { isSignedIn } = useUser();
   const [transcripts, setTranscripts] = useState<Transcript[]>([]);
 
-  // fetch list of transcripts once
+  // Fetch transcripts after login
   useEffect(() => {
-    if (session) {
+    if (isSignedIn) {
       fetch("/api/transcripts")
         .then((res) => {
           if (!res.ok) throw new Error("Kon notulen niet laden");
@@ -24,11 +24,11 @@ export default function TranscriptsLayout({
         .then((data) => setTranscripts(data.transcripts))
         .catch((err) => console.error(err));
     }
-  }, [session]);
+  }, [isSignedIn]);
 
   return (
     <div className="flex h-screen">
-      <Sidebar transcripts={session ? transcripts : []} />
+      <Sidebar transcripts={isSignedIn ? transcripts : []} />
       <main className="flex-1 overflow-y-auto">
         {children}
       </main>

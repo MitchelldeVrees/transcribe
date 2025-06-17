@@ -5,9 +5,9 @@ import { saveAs } from "file-saver";
 import { Document, Packer, Paragraph, TextRun } from "docx";
 import { stopwords } from "./stopwords"; // adjust path as needed
 import Sidebar, { Transcript } from "../components/Sidebar";
-import { useSession } from "next-auth/react";
 import ResultsSection from "@/components/ResultsSection";
 import Swal from 'sweetalert2';
+import { useUser, useClerk, SignedOut, SignedIn } from "@clerk/nextjs";
 
 interface TranscribeResponse {
   text: string;
@@ -26,7 +26,6 @@ export default function Home() {
   // States for file data and transcription
   const progressInterval = useRef<NodeJS.Timeout>();
   const [transcripts, setTranscripts] = useState<Transcript[]>([])
-  const { data: session } = useSession();
   const [saving, setSaving] = useState(false);
 
   const [file, setFile] = useState<File | null>(null);
@@ -48,8 +47,8 @@ export default function Home() {
   // At the top with your other states
   const [speakersTranscript, setSpeakersTranscript] = useState("");
 
-
-  const [ffmpegLoaded, setFfmpegLoaded] = useState(false);
+  const { user, isSignedIn } = useUser();
+  const { signOut } = useClerk();
 
   // New state: transcription model choice ("assembly" or "openai")
   // New state: summarization enabled (true/false)
@@ -59,7 +58,7 @@ export default function Home() {
   const audioRef = useRef<HTMLAudioElement>(null);
 
   async function handleSave() {
-    if (!session) return;           // extra guard
+    if (!isSignedIn) return;           // extra guard
     setSaving(true);
   
     try {
@@ -104,7 +103,7 @@ export default function Home() {
 
   
   useEffect(() => {
-    if (session) {
+    if (isSignedIn) {
       fetch("/api/transcripts")
         .then((res) => {
           if (!res.ok) throw new Error("AUTH_ERROR");
@@ -116,7 +115,7 @@ export default function Home() {
           setError("Er is iets misgegaan bij het ophalen van je transcripts.");
         });
     }
-  }, [session]);
+  }, [isSignedIn]);
 
   // Handle file selection
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -590,16 +589,16 @@ Speaker 2: We willen vooral focussen op AI-integraties en performanceoptimalisat
   </h2>
   <button
     onClick={handleSave}
-    disabled={saving || !session}
+    disabled={saving || !isSignedIn}
     className={`px-4 py-2 rounded ${
-      session
+      isSignedIn
         ? saving
           ? "bg-gray-400 text-white cursor-not-allowed"
           : "bg-green-600 text-white hover:bg-green-700"
         : "bg-gray-300 text-gray-600 cursor-not-allowed"
     }`}
   >
-    {saving ? "Saving…" : session ? "Save to Account" : "Sign in to Save"}
+    {saving ? "Saving…" : isSignedIn ? "Save to Account" : "Sign in to Save"}
   </button>
 </div>
 
