@@ -406,7 +406,7 @@ export default function Home() {
        
 
 
-        <div className="text-center mb-12">
+        <div className="text-center mb-12 pt-5">
           <h1 className="text-4xl font-bold text-gray-800 mb-2">
             Audio Transcriber
           </h1>
