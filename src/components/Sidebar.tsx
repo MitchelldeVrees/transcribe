@@ -28,38 +28,52 @@ export default function Sidebar({ transcripts }: SidebarProps) {
   return (
     <>
       {/* Hamburger / Close button with title */}
-      <div className="fixed top-4 left-4 z-50 flex items-center space-x-2">
-        <button
-          onClick={toggleSidebar}
-          className="p-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none transition-colors"
+      
+<div className="fixed top-4 left-4 z-50 flex items-center space-x-2">
+  <button
+    onClick={toggleSidebar}
+    className="relative w-10 h-10 p-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none transition-colors overflow-hidden"
+  >
+    <AnimatePresence initial={false} mode="wait">
+      {isOpen ? (
+        <motion.div
+          key="close"
+          initial={{ rotate: -90, opacity: 0 }}
+          animate={{ rotate: 0, opacity: 1 }}
+          exit={{  rotate: 90, opacity: 0 }}
+          transition={{ duration: 0.2 }}
+          style={{
+            
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+          }}
         >
-          <AnimatePresence exitBeforeEnter initial={false}>
-            {isOpen ? (
-              <motion.div
-                key="close"
-                initial={{ rotate: -90, opacity: 0 }}
-                animate={{ rotate: 0, opacity: 1 }}
-                exit={{ rotate: 90, opacity: 0 }}
-                transition={{ duration: 0.2 }}
-              >
-                <FaTimes />
-              </motion.div>
-            ) : (
-              <motion.div
-                key="open"
-                initial={{ rotate: 90, opacity: 0 }}
-                animate={{ rotate: 0, opacity: 1 }}
-                exit={{ rotate: -90, opacity: 0 }}
-                transition={{ duration: 0.2 }}
-              >
-                <FaBars />
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </button>
-        {/* Show title only when sidebar collapsed or open? Always show? */}
-        {isOpen && <span className="text-white text-xl font-bold">Luisterslim</span>}
-      </div>
+          <FaTimes size={20} />
+        </motion.div>
+      ) : (
+        <motion.div
+          key="open"
+          initial={{ rotate: 90, opacity: 0 }}
+          animate={{ rotate: 0, opacity: 1 }}
+          exit={{ rotate: -90, opacity: 0 }}
+          transition={{ duration: 0.2 }}
+          style={{
+            
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+          }}
+        >
+          <FaBars size={20} />
+        </motion.div>
+      )}
+    </AnimatePresence>
+  </button>
+
+  {isOpen && <span className="text-white text-xl font-bold">Luisterslim</span>}
+</div>
+
 
       {/* Sidebar container */}
       <motion.aside
@@ -82,7 +96,7 @@ export default function Sidebar({ transcripts }: SidebarProps) {
               Log in om je notules te bekijken en op te slaan.
             </p>
             <button
-              onClick={() => (window.location.href = "/sign-in")}
+              onClick={() => (window.location.href = "https://accounts.luisterslim.nl/sign-in")}
               className="w-full bg-white text-blue-800 py-2 px-4 rounded-md font-medium hover:bg-blue-700 transition-all"
             >
               <FaSignInAlt className="inline mr-2" /> Login
@@ -90,7 +104,7 @@ export default function Sidebar({ transcripts }: SidebarProps) {
           </div>
         )}
 
-        {/* Recente notulen */}
+        
         {isOpen && (
           <>
             <div className="px-4 py-2 border-b border-blue-700 flex items-center space-x-2">

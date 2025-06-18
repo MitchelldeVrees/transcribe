@@ -3,6 +3,7 @@
 
 import React from "react";
 import DOMPurify from "dompurify";
+import { FaCopy } from "react-icons/fa";
 
 interface WordFreq { word: string; count: number; }
 interface QnaItem  { question: string; answer: string; }
@@ -73,7 +74,7 @@ export default function ResultsSection({
 
       {/* Transcript, Summary, Speakers, Actions, Q&A, Word Frequency */}
       <div className="space-y-6">
-        {/* Reusable Section Panel */}
+        {/* Transcript */}
         {renderPanel(
           "Transcript",
           transcript,
@@ -83,6 +84,7 @@ export default function ResultsSection({
           true
         )}
 
+        {/* Samenvatting */}
         {summary && renderPanel(
           "Samenvatting",
           summary,
@@ -92,36 +94,45 @@ export default function ResultsSection({
           false
         )}
 
+        {/* Sprekers Transcript */}
         {speakersTranscript && renderPanel(
           "Sprekers Transcript",
           speakersTranscript,
           speakersTranscript,
           () => navigator.clipboard.writeText(speakersTranscript),
           undefined,
-          false,
-          true
+          false
         )}
 
+        {/* Actiepunten & Taken */}
         {actionItems && renderPanel(
           "Actiepunten & Taken",
-          actionItems,
           actionItems.split("\n").filter(line => line.trim()),
+          actionItems,
           () => navigator.clipboard.writeText(actionItems),
-          undefined
+          undefined,
+          false
         )}
 
+        {/* Vragen & Antwoorden */}
         {qna.length > 0 && (
           <div>
             <div className="flex justify-between items-center mb-2">
               <h3 className="text-lg font-semibold text-gray-800">Vragen & Antwoorden</h3>
               <button
-                onClick={() => navigator.clipboard.writeText(
-                  qna.map(item => `Vraag: ${item.question}\nAntwoord: ${item.answer}`).join("\n\n")
-                )}
-                className="px-3 py-1 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition"
-              >Kopieer Q&A</button>
+                onClick={() =>
+                  navigator.clipboard.writeText(
+                    qna
+                      .map(item => `Vraag: ${item.question}\nAntwoord: ${item.answer}`)
+                      .join("\n\n")
+                  )
+                }
+                className="inline-flex items-center px-2 py-1 bg-blue-50 text-blue-700 rounded-md hover:bg-blue-100 transition text-sm font-medium"
+              >
+                <FaCopy className="mr-1" /> Kopieer Q&A
+              </button>
             </div>
-            <div className="space-y-4">
+            <div className="space-y-4 max-h-100 overflow-y-auto">
               {qna.map((item, idx) => (
                 <div key={idx} className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
                   <p className="font-medium text-blue-900">Vraag</p>
@@ -134,12 +145,12 @@ export default function ResultsSection({
           </div>
         )}
 
-        {/* Woord frequentie as horizontal scroll list */}
+        {/* Woord frequentie */}
         <div className="bg-blue-50 border border-blue-100 rounded-lg p-4">
           <h3 className="text-lg font-semibold text-blue-800 mb-3">Woord frequentie</h3>
-          <div className="flex space-x-2 overflow-x-auto py-2">
+          <div className="flex flex-wrap gap-2 py-2">
             {wordFrequencies.map(item => (
-              <span key={item.word} className="flex-shrink-0 px-3 py-1 bg-white rounded-full text-sm shadow-sm">
+              <span key={item.word} className="px-3 py-1 bg-white rounded-full text-sm shadow-sm">
                 {item.word} <span className="font-medium text-blue-600">{item.count}</span>
               </span>
             ))}
@@ -153,11 +164,15 @@ export default function ResultsSection({
           onClick={handleSave}
           disabled={saving}
           className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-        >{saving ? 'Saving…' : 'Save to Account'}</button>
+        >
+          {saving ? "Saving…" : "Save to Account"}
+        </button>
         <button
           onClick={handleNewTranscription}
           className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition"
-        >Begin nieuwe notulen</button>
+        >
+          Begin nieuwe notulen
+        </button>
       </div>
     </div>
   );
@@ -172,18 +187,37 @@ function renderPanel(
   extraAction?: () => void,
   preserveWhitespace = false
 ) {
-  const lines = Array.isArray(content) ? content : content.split(preserveWhitespace ? "" : "\n\n");
+  let lines: any[];
+  if (Array.isArray(content)) {
+    lines = content;
+  } else if (preserveWhitespace) {
+    lines = content.split("\n");
+  } else {
+    lines = content.split("\n\n");
+  }
+
   return (
     <div>
       <div className="flex justify-between items-center mb-2">
         <h3 className="text-lg font-semibold text-gray-800">{title}</h3>
-        <div className="flex space-x-2">
-          <button onClick={onCopy} className="px-3 py-1 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition">Kopieer</button>
-        </div>
+        <button
+          onClick={onCopy}
+          className="inline-flex items-center px-2 py-1 bg-blue-50 text-blue-700 rounded-md hover:bg-blue-100 transition text-sm font-medium"
+        >
+          <FaCopy className="mr-1" /> Kopieer
+        </button>
       </div>
-      <div className={`bg-gray-50 border border-gray-200 rounded-lg p-4 max-h-72 overflow-y-auto text-gray-800 ${preserveWhitespace ? 'whitespace-pre-wrap' : ''}`}>
+      <div
+        className={`
+          bg-gray-50 border border-gray-200 rounded-lg p-4
+          max-h-72 overflow-y-auto text-gray-800
+          ${preserveWhitespace ? "whitespace-pre-wrap" : ""}
+        `}
+      >
         {lines.map((line, idx) => (
-          <div key={idx} className="mb-2">{line}</div>
+          <div key={idx} className="mb-2">
+            {line}
+          </div>
         ))}
       </div>
     </div>
