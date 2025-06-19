@@ -2,6 +2,10 @@
 const isProd = process.env.NODE_ENV === 'production';
 
 const nextConfig = {
+  // ① Tell Next.js to produce a standalone build
+  experimental: {
+    outputStandalone: true,
+  },
 
   webpack(config) {
     config.module.rules.push(
@@ -16,7 +20,10 @@ const nextConfig = {
     );
     return config;
   },
+
   eslint: { ignoreDuringBuilds: true },
+
+  // ② Include all your existing envs … plus the two Clerk keys
   env: {
     OPENAI_API_KEY: process.env.OPENAI_API_KEY,
     GROK_API_KEY: process.env.GROK_API_KEY,
@@ -28,9 +35,13 @@ const nextConfig = {
     CF_API_TOKEN: process.env.CF_API_TOKEN,
     TURSO_URL: process.env.TURSO_URL,
     TURSO_AUTH_TOKEN: process.env.TURSO_AUTH_TOKEN,
+
+    // ← Add these two:
+    NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
+    CLERK_SECRET_KEY:            process.env.CLERK_SECRET_KEY,
   },
+
   assetPrefix: isProd ? '/' : '',
 };
-
 
 export default nextConfig;
