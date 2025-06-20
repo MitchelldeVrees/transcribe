@@ -19,6 +19,7 @@
     "@ffmpeg/core": "^0.12.10",
     "@ffmpeg/ffmpeg": "^0.12.15",
     "@ffmpeg/util": "^0.12.2",
+    "@heroicons/react": "^2.2.0",
     "@libsql/client": "^0.15.4",
     "@libsql/isomorphic-ws": "^0.1.5",
     "archiver": "^7.0.1",
