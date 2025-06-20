@@ -161,9 +161,7 @@ export default function Sidebar({ transcripts }: SidebarProps) {
               <div className="text-xs text-indigo-300">Free Plan</div>
             </div>
             <div className="flex justify-between text-xs">
-              <button className="text-indigo-300 hover:text-white">
-                <FaCog className="inline mr-1" /> Instellingen
-              </button>
+              
               <button
                 onClick={() => signOut()}
                 className="text-indigo-300 hover:text-white"
