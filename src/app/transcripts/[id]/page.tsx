@@ -28,7 +28,8 @@ interface TranscriptDetail {
 
 export default function TranscriptPage() {
   const { id } = useParams();
-  const { user, isSignedIn } = useUser();
+  // Grab user info and loading state from Clerk
+  const { user, isLoaded, isSignedIn } = useUser();
   const MAX_TITLE_LENGTH = 50;
 
   // --- 1) SWR for sidebar list ---
@@ -37,7 +38,7 @@ export default function TranscriptPage() {
     isLoading: listLoading,
     error: listError,
     mutate: mutateList
-  } = useSWR(isSignedIn ? "/api/transcripts" : null, fetcher, {
+  } = useSWR(isLoaded && isSignedIn ? "/api/transcripts" : null, fetcher, {
     revalidateOnFocus: false,
   });
 
@@ -48,7 +49,7 @@ export default function TranscriptPage() {
     error: detailError,
     mutate: mutateDetail
   } = useSWR(
-    isSignedIn && id ? `/api/transcripts/${id}` : null,
+    isLoaded && isSignedIn && id ? `/api/transcripts/${id}` : null,
     fetcher,
     { revalidateOnFocus: false }
   );
@@ -119,6 +120,14 @@ export default function TranscriptPage() {
   }
 
   // Guards: auth / loading / error
+  if (!isLoaded) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        Loading...
+      </div>
+    );
+  }
+
   if (!isSignedIn) {
     return (
       <div className="flex h-screen">

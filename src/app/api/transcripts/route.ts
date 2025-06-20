@@ -3,6 +3,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth, clerkClient } from '@clerk/nextjs/server';
 import { getTursoClient } from '@/lib/turso';
+import { sanitizeTitle } from '@/lib/validation';
 
 export async function GET(req: NextRequest) {
   const { userId } = await auth();
@@ -63,7 +64,26 @@ export async function POST(req: NextRequest) {
   const email = user.emailAddresses[0]?.emailAddress || '';
   const name = user.firstName + ' ' + (user.lastName || '');
 
-  const { title, content, summary, actionItems, qna } = await req.json();
+  let body: any;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+  }
+  const { title, content, summary, actionItems, qna } = body;
+
+  const cleanTitle = sanitizeTitle(title);
+  if (!cleanTitle || typeof content !== 'string' || content.trim() === '') {
+    return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
+  }
+
+  let qnaPayload: any = null;
+  if (Array.isArray(qna)) {
+    const sanitizedQna = qna.filter(item =>
+      item && typeof item.question === 'string' && typeof item.answer === 'string'
+    ).map(item => ({ question: item.question.trim(), answer: item.answer.trim() }));
+    qnaPayload = sanitizedQna.length > 0 ? JSON.stringify(sanitizedQna) : null;
+  }
   const db = getTursoClient();
 
   // Ensure user exists
@@ -92,11 +112,11 @@ export async function POST(req: NextRequest) {
       (title, transcript, summary, actionPoints, qna, created, userId)
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
     [
-      title,
+      cleanTitle,
       content,
-      summary || null,
-      actionItems || null,
-      qna ? JSON.stringify(qna) : null,
+      typeof summary === 'string' ? summary : null,
+      typeof actionItems === 'string' ? actionItems : null,
+      qnaPayload,
       createdAt,
       userIdDb
     ]

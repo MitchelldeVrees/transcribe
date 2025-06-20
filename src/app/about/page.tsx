@@ -6,12 +6,12 @@ import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
 
 export default function AboutPage() {
-  const { isSignedIn } = useUser();
+  const { isLoaded, isSignedIn } = useUser();
   const [transcripts, setTranscripts] = useState<Transcript[]>([]);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (isSignedIn) {
+    if (isLoaded && isSignedIn) {
       fetch("/api/transcripts")
         .then((res) => {
           if (!res.ok) throw new Error("AUTH_ERROR");
@@ -23,7 +23,13 @@ export default function AboutPage() {
           setError("Er is iets misgegaan bij het ophalen van je transcripts.");
         });
     }
-  }, [isSignedIn]);
+  }, [isLoaded, isSignedIn]);
+
+  if (!isLoaded) {
+    return (
+      <div className="flex items-center justify-center h-screen">Loading...</div>
+    );
+  }
 
   return (
     <div className="bg-gray-50 min-h-screen">

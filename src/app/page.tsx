@@ -48,7 +48,8 @@ export default function Home() {
   // At the top with your other states
   const [speakersTranscript, setSpeakersTranscript] = useState("");
 
-  const { user, isSignedIn } = useUser();
+  // Clerk gives us the user object, whether the data has loaded, and the sign-in state
+  const { user, isLoaded, isSignedIn } = useUser();
   const { signOut } = useClerk();
 
   // New state: transcription model choice ("assembly" or "openai")
@@ -103,8 +104,9 @@ export default function Home() {
   
 
   
+  // Fetch transcripts only when Clerk has loaded and the user is signed in
   useEffect(() => {
-    if (isSignedIn) {
+    if (isLoaded && isSignedIn) {
       fetch("/api/transcripts")
         .then((res) => {
           if (!res.ok) throw new Error("AUTH_ERROR");
@@ -116,7 +118,7 @@ export default function Home() {
           setError("Er is iets misgegaan bij het ophalen van je transcripts.");
         });
     }
-  }, [isSignedIn]);
+  }, [isLoaded, isSignedIn]);
 
   // Handle file selection
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -346,9 +348,16 @@ export default function Home() {
   };
 
   
+  // Wait for Clerk to finish loading before rendering the app
+  if (!isLoaded) {
+    return (
+      <div className="flex items-center justify-center h-screen">Loading...</div>
+    );
+  }
+
   return (
-    
-    
+
+
     <div className="bg-gray-50 min-h-screen">
       
 
