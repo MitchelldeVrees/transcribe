@@ -109,10 +109,9 @@ export async function POST(req: NextRequest) {
   const createdAt = new Date().toISOString();
   await db.execute(
     `INSERT INTO transcripts
-      (id, title, transcript, summary, actionPoints, qna, created, userId)
-     VALUES (?,?, ?, ?, ?, ?, ?, ?)`,
+      (title, transcript, summary, actionPoints, qna, created, userId)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
     [
-      transcriptId,
       cleanTitle,
       content,
       typeof summary === 'string' ? summary : null,
