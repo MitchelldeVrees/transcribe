@@ -144,11 +144,7 @@ export default function Sidebar({ transcripts }: SidebarProps) {
               {/* New transcript link */}
               <div className="p-4">
                 <Link
-                  href="/"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    window.location.reload();
-                  }}
+                  href="/#"
                   className="inline-block text-sm text-blue-200 hover:text-white font-semibold"
                 >
                   Maak een nieuwe notulen +
