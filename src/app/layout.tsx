@@ -20,12 +20,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-              <ClerkProvider>
-                
-
-      <body className={inter.className}>{children}</body>
-      </ClerkProvider>
-
+      <body className={inter.className}>
+        {/* ClerkProvider should wrap the application inside the body */}
+        <ClerkProvider>{children}</ClerkProvider>
+      </body>
     </html>
   );
 }

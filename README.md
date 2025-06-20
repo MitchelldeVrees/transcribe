@@ -5,6 +5,20 @@ om te deployen
 npm run deploy
 
 
+## Environment configuration
+
+Create a `.env.local` file for development and `.env.production` for your
+production deployment. At minimum these files should contain your Clerk keys:
+
+```
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_xxxx
+CLERK_SECRET_KEY=sk_test_xxxx
+```
+
+Use your real production keys in the production file. Next.js will load the
+appropriate file based on `NODE_ENV`.
+
+
 
 ## Retention Features (Keep Users Coming Back)
 - [ ] Add a **Transcript Library** where users can save/search all past transcripts  
