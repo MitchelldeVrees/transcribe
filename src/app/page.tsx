@@ -7,6 +7,7 @@ import { stopwords } from "./stopwords"; // adjust path as needed
 import Sidebar, { Transcript } from "../components/Sidebar";
 import ResultsSection from "@/components/ResultsSection";
 import Swal from 'sweetalert2';
+import Link from "next/link";
 import { useUser, useClerk, SignedOut, SignedIn } from "@clerk/nextjs";
 
 interface QnaItem {
@@ -413,6 +414,14 @@ export default function Home() {
           <p className="text-gray-600">
           Upload een mp3, mp4, mpeg, mpga, m4a, wav of webm bestand
           </p>
+          <div className="mt-4">
+            <Link
+              href="/about"
+              className="inline-block px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Over deze applicatie
+            </Link>
+          </div>
         </div>
   {/* Transcription Model Dropdown */}
   
