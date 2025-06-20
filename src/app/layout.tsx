@@ -7,7 +7,7 @@ const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "Luisterslim",
-  description: "Transcribe Nederlandse audio",
+  description: "Nederlandse AI voor het notuleren en samenvatten van audio",
   icons: {
     icon: '/favicon.png',
   },
