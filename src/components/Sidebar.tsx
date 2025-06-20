@@ -163,7 +163,10 @@ export default function Sidebar({ transcripts }: SidebarProps) {
             <div className="flex justify-between text-xs">
               
               <button
-                onClick={() => signOut()}
+                onClick={() =>
+                  signOut().catch((err) =>
+                    console.error('Sign-out failed', err)
+                  )}
                 className="text-indigo-300 hover:text-white"
               >
                 <FaSignOutAlt className="inline mr-1" /> Logout

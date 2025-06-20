@@ -1,6 +1,7 @@
 {
   "name": "transcribe",
   "description": "Build a full-stack web application with Next.js.",
+  "type": "module",
   "cloudflare": {
     "label": "Next.js Framework Starter",
     "products": [
@@ -71,6 +72,7 @@
     "build": "next build",
     "cf-build": "npx opennextjs-cloudflare build",
     "cf-deploy": "npx opennextjs-cloudflare deploy",
-    "deploy": "npm run cf-build && npm run cf-deploy"
+    "deploy": "npm run cf-build && npm run cf-deploy",
+    "test": "node --test"
   }
 }
