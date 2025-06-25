@@ -21,6 +21,7 @@ interface TranscribeResponse {
   actionItems?:string;
   qna?:        QnaItem[];   // ← now qna really is an array of {question,answer}
 }
+const STORAGE_KEY = "pendingTranscriptData";
 
 
 export default function Home() {
@@ -49,8 +50,9 @@ export default function Home() {
   const [speakersTranscript, setSpeakersTranscript] = useState("");
 
   // Clerk gives us the user object, whether the data has loaded, and the sign-in state
-  const { user, isLoaded, isSignedIn } = useUser();
-  const { signOut } = useClerk();
+  const { isSignedIn, isLoaded } = useUser();
+  const { openSignIn } = useClerk();
+  const [pendingSave, setPendingSave] = useState(false);
 
   // New state: transcription model choice ("assembly" or "openai")
   // New state: summarization enabled (true/false)
@@ -59,52 +61,6 @@ export default function Home() {
   // Reference to the audio element
   const audioRef = useRef<HTMLAudioElement>(null);
 
-  async function handleSave() {
-    if (!isSignedIn) return;           // extra guard
-    setSaving(true);
-  
-    try {
-      const res = await fetch("/api/transcripts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: fileName || "Untitled Transcript",
-          content: transcript,
-          summary,
-          actionItems,
-          qna,
-        }),
-      });
-  
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text);
-      }
-  
-      await Swal.fire({
-        icon: "success",
-        title: "Saved!",
-        text: "Transcript saved successfully.",
-        timer: 2000,
-        showConfirmButton: false,
-      });
-  
-      // optionally re-fetch your transcripts list here
-    } catch (err: any) {
-      console.error("Save failed:", err);
-      await Swal.fire({
-        icon: "error",
-        title: "Save failed",
-        text: err.message || "Er is iets misgegaan.",
-      });
-    } finally {
-      setSaving(false);
-    }
-  }
-  
-
-  
-  // Fetch transcripts only when Clerk has loaded and the user is signed in
   useEffect(() => {
     if (isLoaded && isSignedIn) {
       fetch("/api/transcripts")
@@ -120,6 +76,82 @@ export default function Home() {
     }
   }, [isLoaded, isSignedIn]);
 
+  useEffect(() => {
+    const stored = typeof window !== 'undefined' ? window.localStorage.getItem(STORAGE_KEY) : null;
+    if (stored) {
+      try {
+        const data = JSON.parse(stored);
+        setTranscript(data.transcript || "");
+        setSummary(data.summary || "");
+        setActionItems(data.actionItems || "");
+        setQna(data.qna || []);
+        setFileName(data.fileName || "");
+        setAudioDuration(data.audioDuration || "0:00");
+        setWordCount(data.wordCount || 0);
+        setProcessingTime(data.processingTime || 0);
+        setWordFrequencies(data.wordFrequencies || []);
+        setSpeakersTranscript(data.speakersTranscript || "");
+        setStage("results");
+      } catch {
+        window.localStorage.removeItem(STORAGE_KEY);
+      }
+    }
+  }, []);
+
+  async function handleSave() {
+    if (!isSignedIn) return;
+    setSaving(true);
+    try {
+      const res = await fetch("/api/transcripts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: fileName || "Untitled Transcript",
+          content: transcript,
+          summary,
+          actionItems,
+          qna,
+          processingTime,
+          audioDuration
+        }),
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text);
+      }
+      await Swal.fire({
+        icon: "success",
+        title: "Saved!",
+        text: "Transcript saved successfully.",
+        timer: 2000,
+        showConfirmButton: false,
+      });
+      // Optionally re-fetch transcripts
+    } catch (err: any) {
+      console.error("Save failed:", err);
+      await Swal.fire({
+        icon: "error",
+        title: "Save failed",
+        text: err.message || "Er is iets misgegaan.",
+      });
+    } finally {
+      setSaving(false);
+    }
+  }
+  
+  useEffect(() => {
+    if (isSignedIn) {
+      const stored = typeof window !== 'undefined' ? window.localStorage.getItem(STORAGE_KEY) : null;
+      if (stored) {
+        handleSave().finally(() => {
+          window.localStorage.removeItem(STORAGE_KEY);
+        });
+      }
+    }
+  }, [isSignedIn]);
+  
+  // Fetch transcripts only when Clerk has loaded and the user is signed in
+  
   // Handle file selection
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -128,7 +160,12 @@ export default function Home() {
     }
   };
 
-  
+  useEffect(() => {
+    if (isSignedIn && pendingSave) {
+      handleSave().finally(() => setPendingSave(false));
+    }
+  }, [isSignedIn, pendingSave]);
+
   useEffect(() => {
     // whenever we enter "loading", start fresh
     if (stage === "loading") {
@@ -333,7 +370,8 @@ export default function Home() {
  
   
   // Reset to start a new transcription
-  const handleNewTranscription = () => {
+  function handleNewTranscription() {
+    window.localStorage.removeItem(STORAGE_KEY);
     setFile(null);
     setFileName("");
     setAudioUrl("");
@@ -345,7 +383,8 @@ export default function Home() {
     setWordCount(0);
     setProcessingTime(0);
     setStage("upload");
-  };
+  }
+
 
   
   // Wait for Clerk to finish loading before rendering the app
@@ -561,18 +600,36 @@ export default function Home() {
     <i className="fas fa-file-alt mr-3"></i> Transcript resultaten
   </h2>
   <button
-    onClick={handleSave}
-    disabled={saving || !isSignedIn}
-    className={`px-4 py-2 rounded ${
-      isSignedIn
-        ? saving
-          ? "bg-gray-400 text-white cursor-not-allowed"
-          : "bg-green-600 text-white hover:bg-green-700"
-        : "bg-gray-300 text-gray-600 cursor-not-allowed"
-    }`}
-  >
-    {saving ? "Saving…" : isSignedIn ? "Save to Account" : "Sign in to Save"}
-  </button>
+                  onClick={() => {
+                    if (!isSignedIn) {
+                      // store current data so we can restore after login
+                      const data = {
+                        transcript,
+                        summary,
+                        actionItems,
+                        qna,
+                        fileName,
+                        audioDuration,
+                        wordCount,
+                        processingTime,
+                        wordFrequencies,
+                        speakersTranscript,
+                      };
+                      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+                      openSignIn();
+                    } else {
+                      handleSave();
+                    }
+                  }}
+                  disabled={saving}
+                  className={`px-4 py-2 rounded ${
+                    saving
+                      ? "bg-gray-400 text-white cursor-not-allowed"
+                      : "bg-green-600 text-white hover:bg-green-700"
+                  }`}
+                >
+                  {saving ? "Saving…" : "Save to Account"}
+                </button>
 </div>
 
             <ResultsSection
@@ -592,15 +649,7 @@ export default function Home() {
             />
 
               
-              <div className="border-t border-gray-200 p-6 bg-gray-50">
-                <button
-                  id="new-transcription"
-                  onClick={handleNewTranscription}
-                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200 flex items-center mx-auto"
-                >
-                  <i className="fas fa-redo mr-2"></i> Begin nieuwe notulen
-                </button>
-              </div>
+              
             </div>
           )}
 

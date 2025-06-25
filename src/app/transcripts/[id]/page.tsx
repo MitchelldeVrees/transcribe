@@ -96,28 +96,21 @@ export default function TranscriptPage() {
       if (!res.ok) {
         throw new Error(await res.text());
       }
-
-      mutateDetail(
-        {
-          transcript: { ...detailData!.transcript, title: titleInput },
-        },
-        false
-      );
-
-      mutateList(
-        {
-          transcripts: listData!.transcripts.map((t: Transcript) =>
-            t.id === id ? { ...t, title: titleInput } : t
-          ),
-        },
-        false
-      );
+      // trigger a refetch for the detail endpoint:
+      await mutateDetail();        
+      // update your list titles optimistically if you like:
+      mutateList(prev => ({
+        transcripts: prev!.transcripts.map(t =>
+          t.id === id ? { ...t, title: titleInput } : t
+        )
+      }), false);
     } catch (e) {
       console.error("Failed to save title", e);
     } finally {
       setIsEditing(false);
     }
   }
+  
 
   // Guards: auth / loading / error
   if (!isLoaded) {
@@ -172,7 +165,7 @@ export default function TranscriptPage() {
     <div className="flex h-screen">
       <Sidebar transcripts={transcripts} />
 
-      <main className="flex-1 overflow-y-auto p-6 bg-gray-50">
+      <main className="flex-1 overflow-y-auto px-6 pb-6 pt-16 bg-gray-50">
         {/* Inline‐editable title */}
         {isEditing ? (
           <div className="relative mb-1">

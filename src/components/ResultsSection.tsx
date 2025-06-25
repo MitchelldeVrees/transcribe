@@ -4,6 +4,7 @@
 import React from "react";
 import DOMPurify from "dompurify";
 import { FaCopy } from "react-icons/fa";
+import { useUser } from "@clerk/nextjs";
 
 interface WordFreq { word: string; count: number; }
 interface QnaItem  { question: string; answer: string; }
@@ -39,6 +40,8 @@ export default function ResultsSection({
   exportToWord,
   handleNewTranscription,
 }: ResultsSectionProps) {
+  const { isSignedIn } = useUser();
+
   return (
     <div id="results-section" className="space-y-6 px-4 py-6">
       {/* Metrics responsive grid */}
@@ -160,16 +163,18 @@ export default function ResultsSection({
 
       {/* Buttons at bottom */}
       <div className="flex flex-col sm:flex-row justify-center sm:justify-end gap-3">
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-        >
-          {saving ? "Saving…" : "Save to Account"}
-        </button>
+        {!isSignedIn && (
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+          >
+            {saving ? "Saving…" : "Save to Account"}
+          </button>
+        )}
         <button
           onClick={handleNewTranscription}
-          className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition"
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition"
         >
           Begin nieuwe notulen
         </button>

@@ -84,9 +84,16 @@ export default function Sidebar({ transcripts }: SidebarProps) {
         initial={false}
         animate={{ width: isOpen ? SIDEBAR_WIDTH : 0 }}
         transition={{ type: "tween", duration: 0.3 }}
-        className="bg-blue-600 text-white flex flex-col h-screen overflow-hidden fixed top-0 left-0"
-        style={{ width: SIDEBAR_WIDTH }}
+        className={`
+          /* mobile: overlay under the button */
+          fixed inset-y-0 left-0 z-40
+          bg-blue-600 text-white flex flex-col overflow-hidden
+
+          /* show in-flow on desktop so it pushes main */
+          md:relative md:inset-auto md:z-auto
+        `}
       >
+        
         {/* Spacer under header */}
         <div className="pt-16" />
 

@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
   } catch {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
-  const { title, content, summary, actionItems, qna } = body;
+  const { title, content, summary, actionItems, qna,processingTime,audioDuration } = body;
 
   const cleanTitle = sanitizeTitle(title);
   if (!cleanTitle || typeof content !== 'string' || content.trim() === '') {
@@ -109,8 +109,8 @@ export async function POST(req: NextRequest) {
   const createdAt = new Date().toISOString();
   await db.execute(
     `INSERT INTO transcripts
-      (id, title, transcript, summary, actionPoints, qna, created, userId)
-     VALUES (?,?, ?, ?, ?, ?, ?, ?)`,
+      (id, title, transcript, summary, actionPoints, qna, created, userId, length, audioLength)
+     VALUES (?,?, ?, ?, ?, ?, ?, ?,?,?)`,
     [
       transcriptId,
       cleanTitle,
@@ -119,7 +119,9 @@ export async function POST(req: NextRequest) {
       typeof actionItems === 'string' ? actionItems : null,
       qnaPayload,
       createdAt,
-      userIdDb
+      userIdDb,
+      processingTime,
+      audioDuration
     ]
   );
 
