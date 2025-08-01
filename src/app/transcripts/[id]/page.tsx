@@ -99,7 +99,7 @@ export default function TranscriptPage() {
       // trigger a refetch for the detail endpoint:
       await mutateDetail();        
       // update your list titles optimistically if you like:
-      mutateList(prev => ({
+      mutateList((prev: { transcripts: Transcript[] } | undefined) => ({
         transcripts: prev!.transcripts.map(t =>
           t.id === id ? { ...t, title: titleInput } : t
         )

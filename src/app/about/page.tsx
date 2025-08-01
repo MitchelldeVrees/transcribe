@@ -13,6 +13,10 @@ import {
   LockClosedIcon,
   UserIcon,
   Cog8ToothIcon,
+  TrashIcon,
+  BugAntIcon,
+  QuestionMarkCircleIcon,
+  EnvelopeIcon,
 } from "@heroicons/react/24/outline";
 
 const featureList = [
@@ -117,14 +121,6 @@ export default function AboutPage() {
                 enkele minuten een volledig transcript, samenvatting en
                 actiepunten – altijd AVG-proof en met volledige controle.
               </motion.p>
-              <motion.div
-                className="mt-8 flex justify-center"
-                initial={{ scale: 0.8, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={{ delay: 0.8, type: "spring", stiffness: 100 }}
-              >
-                
-              </motion.div>
             </div>
           </section>
 
@@ -174,17 +170,108 @@ export default function AboutPage() {
                 <li>Je data is altijd versleuteld en blijft in de EU</li>
                 <li>We vragen alleen wat écht nodig is en maken data anoniem</li>
                 <li>Jij hebt de controle: bekijk, wijzig of verwijder je gegevens in het dashboard</li>
+                <li>
+                  Lees voor meer details ons{' '}
+                  <Link
+                    href="/privacyVerklaring"
+                    className="text-blue-600 hover:underline font-medium"
+                  >
+                    volledige privacybeleid
+                  </Link>
+                </li>
               </ul>
-              <div className="flex justify-center">
+              <div className="flex justify-center mb-6">
                 <ShieldCheckIcon className="w-20 h-20 text-blue-400 animate-bounce" />
               </div>
             </motion.div>
           </section>
 
-          {/* Error */}
-          {error && (
-            <p className="text-red-600 mt-4 text-center px-6">{error}</p>
-          )}
+          {/* Contact Cards */}
+          <section className="bg-white py-16">
+            <motion.div
+              className="container mx-auto px-6 text-center"
+              initial={{ opacity: 0 }}
+              whileInView={{ opacity: 1 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6 }}
+            >
+              <h2 className="text-3xl font-bold text-gray-800 mb-8">
+                Neem contact met ons op
+              </h2>
+              <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4 mb-8">
+                <motion.div
+                  className="p-6 bg-white rounded-2xl shadow hover:shadow-lg transition transform hover:-translate-y-1"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.2, duration: 0.5 }}
+                >
+                  <div className="inline-flex items-center justify-center w-12 h-12 mb-4 rounded-lg bg-blue-100 text-blue-600">
+                    <TrashIcon className="w-6 h-6" />
+                  </div>
+                  <h3 className="text-xl font-semibold mb-2 text-gray-800">
+                    Data verwijderen
+                  </h3>
+                  <p className="text-gray-600">
+                    Wil je je data permanent verwijderen? Laat het ons weten.
+                  </p>
+                </motion.div>
+                <motion.div
+                  className="p-6 bg-white rounded-2xl shadow hover:shadow-lg transition transform hover:-translate-y-1"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.4, duration: 0.5 }}
+                >
+                  <div className="inline-flex items-center justify-center w-12 h-12 mb-4 rounded-lg bg-blue-100 text-blue-600">
+                    <BugAntIcon className="w-6 h-6" />
+                  </div>
+                  <h3 className="text-xl font-semibold mb-2 text-gray-800">
+                    Bug gevonden
+                  </h3>
+                  <p className="text-gray-600">
+                    Heb je een bug gevonden? Stuur ons details, we lossen het op!
+                  </p>
+                </motion.div>
+                <motion.div
+                  className="p-6 bg-white rounded-2xl shadow hover:shadow-lg transition transform hover:-translate-y-1"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.6, duration: 0.5 }}
+                >
+                  <div className="inline-flex items-center justify-center w-12 h-12 mb-4 rounded-lg bg-blue-100 text-blue-600">
+                    <QuestionMarkCircleIcon className="w-6 h-6" />
+                  </div>
+                  <h3 className="text-xl font-semibold mb-2 text-gray-800">
+                    Vragen
+                  </h3>
+                  <p className="text-gray-600">
+                    Heb je vragen voor ons? We staan klaar om te helpen.
+                  </p>
+                </motion.div>
+                <motion.div
+                  className="p-6 bg-white rounded-2xl shadow hover:shadow-lg transition transform hover:-translate-y-1"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.8, duration: 0.5 }}
+                >
+                  <div className="inline-flex items-center justify-center w-12 h-12 mb-4 rounded-lg bg-blue-100 text-blue-600">
+                    <EnvelopeIcon className="w-6 h-6" />
+                  </div>
+                  <h3 className="text-xl font-semibold mb-2 text-gray-800">
+                    Neem contact op
+                  </h3>
+                  <p className="text-gray-600">
+                    Neem dan contact met ons op via{' '}
+                    <Link href="mailto:info@luisterslim.nl" className="text-blue-600 hover:underline">
+                      info@luisterslim.nl
+                    </Link>
+                  </p>
+                </motion.div>
+              </div>
+              {error && (
+                <p className="text-red-600 mt-4 text-center px-6">{error}</p>
+              )}
+            </motion.div>
+          </section>
         </div>
       </div>
     </div>

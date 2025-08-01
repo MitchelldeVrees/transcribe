@@ -2,10 +2,15 @@
 const isProd = process.env.NODE_ENV === 'production';
 
 const nextConfig = {
-  // ① Tell Next.js to produce a standalone build
-  experimental: {
-    outputStandalone: true,
-  },
+
+
+  output: 'standalone',
+
+
+  // ② Opt this package out of Next.js’s server-side bundling
+  serverExternalPackages: [
+    "@libsql/isomorphic-ws",
+  ],
 
   webpack(config) {
     config.module.rules.push(
@@ -41,7 +46,7 @@ const nextConfig = {
     CLERK_SECRET_KEY:            process.env.CLERK_SECRET_KEY,
   },
 
-  assetPrefix: isProd ? '/' : '',
+  assetPrefix: '',
 };
 
 export default nextConfig;

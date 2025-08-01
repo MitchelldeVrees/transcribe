@@ -4,6 +4,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 
+type QnaItem = { question: string; answer: string };
+
+type SummarizeResponse = {
+  summaryMd: string;       // Markdown
+  actionItemsMd: string;   // Markdown (bv. lijstjes)
+  qna: QnaItem[];          // Gestructureerd, geen markdown nodig hier
+};
+
 console.log("Loading /api/transcribe route...");
 // Environment variables (no top-level throws)
 const AZURE_FUNCTION_URL = process.env.AZURE_FUNCTION_URL;
@@ -18,9 +26,10 @@ console.log("Environment variables loaded:", {
 /**
  * Sends a single File object to the Azure Function and returns the "transcript" string.
  */
-async function transcribeViaAzure(file: File): Promise<string> {
+async function transcribeViaAzure(file: File, inputField: string): Promise<string> {
   const form = new FormData();
   form.append("audioFile", file, file.name);
+  form.append("prompt", inputField);
 
   const res = await fetch(AZURE_FUNCTION_URL!, {
     method: "POST",
@@ -61,21 +70,27 @@ async function transcribeViaAzure(file: File): Promise<string> {
 /**
  * Summarize the full transcript via Grok 3 Mini on xAI.
  */
+
+
+
 async function summarizeTranscript(
   fullText: string,
-  detectedLang: string
+  detectedLang: string,
+  inputField: string  
 ): Promise<{ summary: string; actionItems: string; qna: string }> {
   const grokClient = new OpenAI({ apiKey: GROK_API_KEY!, baseURL: GROK_BASE_URL! });
 
   const completion = await grokClient.chat.completions.create({
     model: "grok-3-mini",
     messages: [
-      { role: "system", content: "Je bent een transcript-samenvatter die alleen JSON retourneert." },
+      { role: "system", content: `Je retourneert **uitsluitend geldige JSON** (geen code fences, geen uitleg erbuiten).
+Gebruik Tailwind CSS classes. voor de styling van de samenvatting en actionpoints. Denk aan font, grootte, kopjes, alinea's etc. Houdt de styling professioneel en leesbaar.
+  ` },
       {
         role: "user",
         content: `
           %${fullText}%
-                  Act as a professional summarizer. Create a concise and comprehensive summary of the text enclosed in %% above, while adhering to the guidelines enclosed in [ ] below. 
+          Act as a professional summarizer. Create a concise and comprehensive summary of the text enclosed in %% above, while adhering to the guidelines enclosed in [ ] below. 
 
           Guidelines:  
 
@@ -87,8 +102,9 @@ async function summarizeTranscript(
           Rely strictly on the provided text, without including external information. 
           The length of the summary must be appropriate for the length and complexity of the original text. The length must allow to capture the main points and key details, without being overly long. A good reference point is that the summary must be around 0.4-0.6 times the length of the original text.  
           Ensure that the summary is well-organized and easy to read, with clear headings and subheadings to guide the reader through each section. Format each section in paragraph form.
+          ActionItems must only be actionitems no header or title, only action items, use a clear list format with Tailwind CSS classes.
           Give an array "qna" with all questions and their answers. Each element must have the exact format
-
+          The following input was given by the user about the transcript: %{inputField}% 
           [
             {
               "question": "The full question here",
@@ -98,8 +114,8 @@ async function summarizeTranscript(
           ]
           Return it in json format with the following structure:
           {
-            "summary": string,      // Summary of the text in the same language as the text
-            "actionItems": string,  // A separate section with action items that are present in the original text
+            "summary": string (Tailwind css classes),      // Summary of the text in the same language as the text
+            "actionItems": string  (Tailwind css classes, gebruik een duidelijk lijstje),  // A separate section with action items that are present in the original text
             "qna": string           // apart kopje met alle vragen in de originele tekst en bijbehorende antwoorden
           }
           ]`.trim(),
@@ -152,15 +168,22 @@ export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
     const file = formData.get("audioFile");
+    const inputField = formData.get("extraInfo") as string | "";
+    
+
     if (!(file instanceof File)) {
       return NextResponse.json({ error: "Geen audioFile gevonden in de upload." }, { status: 400 });
     }
 
     // 2) Transcribe via Azure
-    const fullText = await transcribeViaAzure(file);
+    const fullText = await transcribeViaAzure(file,inputField);
 
-    // 3) Summarize via Grok
-    const { summary, actionItems, qna } = await summarizeTranscript(fullText, "nl");
+
+
+    // // 3) Summarize via Grok
+    const { summary, actionItems, qna } = await summarizeTranscript(fullText, "nl", inputField);
+
+
 
     // 4) Return JSON
     return NextResponse.json({ text: fullText, summary, actionItems, qna }, { status: 200 });

@@ -4,10 +4,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth, clerkClient } from '@clerk/nextjs/server';
 import { getTursoClient } from '@/lib/turso';
 import { sanitizeTitle } from '@/lib/validation';
+import { generateReferralCode } from '@/lib/referral'
 
 export async function GET(req: NextRequest) {
   const { userId } = await auth();
-
+  console.log(userId);
   if (!userId) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
   }
@@ -26,13 +27,19 @@ export async function GET(req: NextRequest) {
   );
 
   let userIdDb: string;
+  let referralCode: string
+
   if (userRes.rows.length > 0) {
     userIdDb = String(userRes.rows[0].id);
+    referralCode = String(userRes.rows[0].referral_code)
+
   } else {
     const today = new Date().toISOString().split('T')[0];
+    referralCode = generateReferralCode(email)
+
     await db.execute(
-      'INSERT INTO users (email, name, created, subId) VALUES (?, ?, ?, ?)',
-      [email, name, today, subId]
+      'INSERT INTO users (email, name, created, subId,referralCode) VALUES (?, ?, ?, ?,?)',
+      [email, name, today, subId,referralCode]
     );
     const newUserRes = await db.execute(
       'SELECT id FROM users WHERE subId = ?',
@@ -93,14 +100,18 @@ export async function POST(req: NextRequest) {
   );
 
   let userIdDb: string;
+  let referralCode: string
+
   if (userRes.rows.length > 0) {
     userIdDb = String(userRes.rows[0].id);
   } else {
     userIdDb = crypto.randomUUID();
     const created = new Date().toISOString();
+    referralCode = generateReferralCode(email)
+
     await db.execute(
-      'INSERT INTO users (id, email, name, created, subId) VALUES (?, ?, ?, ?, ?)',
-      [userIdDb, email, name, created, userId]
+      'INSERT INTO users (id, email, name, created, subId, referralCode) VALUES (?, ?, ?, ?, ?,?)',
+      [userIdDb, email, name, created, userId,referralCode]
     );
   }
 
