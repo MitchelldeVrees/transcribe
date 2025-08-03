@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import { ClerkProvider } from '@clerk/nextjs';
+import { SessionProvider } from 'next-auth/react';
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -21,8 +21,8 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
-        {/* ClerkProvider should wrap the application inside the body */}
-        <ClerkProvider>{children}</ClerkProvider>
+        {/* SessionProvider wraps the application */}
+        <SessionProvider>{children}</SessionProvider>
       </body>
     </html>
   );

@@ -1,6 +1,7 @@
 // src/app/api/createSubscription/route.ts
 
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAuth } from '@/lib/auth';
 import Stripe from 'stripe';
 
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
@@ -17,6 +18,7 @@ interface CreateSubReq {
 }
 
 export async function POST(request: NextRequest) {
+  await requireAuth(request.headers);
   const { priceId } = (await request.json()) as CreateSubReq;
   if (!priceId) {
     return NextResponse.json(

@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { useUser } from "@clerk/nextjs";
+import { useSession } from "next-auth/react";
 import Sidebar, { Transcript } from "@/components/Sidebar";
 
 export default function TranscriptsLayout({
@@ -10,13 +10,16 @@ export default function TranscriptsLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { isSignedIn } = useUser();
+  const { data: session, status } = useSession();
+  const isSignedIn = status === "authenticated";
   const [transcripts, setTranscripts] = useState<Transcript[]>([]);
 
   // Fetch transcripts after login
   useEffect(() => {
-    if (isSignedIn) {
-      fetch("/api/transcripts")
+    if (isSignedIn && session?.accessToken) {
+      fetch("/api/transcripts", {
+        headers: { Authorization: `Bearer ${session.accessToken}` },
+      })
         .then((res) => {
           if (!res.ok) throw new Error("Kon notulen niet laden");
           return res.json();
@@ -24,7 +27,7 @@ export default function TranscriptsLayout({
         .then((data) => setTranscripts(data.transcripts))
         .catch((err) => console.error(err));
     }
-  }, [isSignedIn]);
+  }, [isSignedIn, session]);
 
   return (
     <div className="flex h-screen">

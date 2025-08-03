@@ -1,22 +1,17 @@
 // src/app/api/transcripts/route.ts
 
 import { NextRequest, NextResponse } from 'next/server';
-import { auth, clerkClient } from '@clerk/nextjs/server';
+import { requireAuth } from '@/lib/auth';
 import { getTursoClient } from '@/lib/turso';
 import { sanitizeTitle } from '@/lib/validation';
 import { generateReferralCode } from '@/lib/referral'
+import crypto from 'crypto'
 
 export async function GET(req: NextRequest) {
-  const { userId } = await auth();
-  console.log(userId);
-  if (!userId) {
-    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
-  }
-
-  const user = await (await clerkClient()).users.getUser(userId);
-  const email = user.emailAddresses[0]?.emailAddress || '';
-  const name = user.firstName + ' ' + (user.lastName || '');
-  const subId = userId;
+  const payload = await requireAuth(req.headers);
+  const subId = String(payload.sub);
+  const email = String(payload.email || '');
+  const name = String(payload.name || '');
 
   const db = getTursoClient();
 
@@ -61,15 +56,10 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const { userId } = await auth();
-
-  if (!userId) {
-    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
-  }
-
-  const user = await (await clerkClient()).users.getUser(userId);
-  const email = user.emailAddresses[0]?.emailAddress || '';
-  const name = user.firstName + ' ' + (user.lastName || '');
+  const payload = await requireAuth(req.headers);
+  const userId = String(payload.sub);
+  const email = String(payload.email || '');
+  const name = String(payload.name || '');
 
   let body: any;
   try {

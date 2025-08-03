@@ -8,7 +8,7 @@ import Sidebar, { Transcript } from "../components/Sidebar";
 import ResultsSection from "@/components/ResultsSection";
 import Swal from 'sweetalert2';
 import Link from "next/link";
-import { useUser, useClerk, SignedOut, SignedIn } from "@clerk/nextjs";
+import { useSession, signIn } from "next-auth/react";
 
 interface QnaItem {
   question: string;
@@ -49,9 +49,10 @@ export default function Home() {
   // At the top with your other states
   const [speakersTranscript, setSpeakersTranscript] = useState("");
 
-  // Clerk gives us the user object, whether the data has loaded, and the sign-in state
-  const { isSignedIn, isLoaded } = useUser();
-  const { openSignIn } = useClerk();
+  // NextAuth session state
+  const { data: session, status } = useSession();
+  const isLoaded = status !== "loading";
+  const isSignedIn = status === "authenticated";
   const [pendingSave, setPendingSave] = useState(false);
 
   // New state: transcription model choice ("assembly" or "openai")
@@ -62,8 +63,10 @@ export default function Home() {
   const audioRef = useRef<HTMLAudioElement>(null);
 
   useEffect(() => {
-    if (isLoaded && isSignedIn) {
-      fetch("/api/transcripts")
+    if (isLoaded && isSignedIn && session?.accessToken) {
+      fetch("/api/transcripts", {
+        headers: { Authorization: `Bearer ${session.accessToken}` },
+      })
         .then((res) => {
           if (!res.ok) throw new Error("AUTH_ERROR");
           return res.json();
@@ -74,7 +77,7 @@ export default function Home() {
           setError("Er is iets misgegaan bij het ophalen van je transcripts.");
         });
     }
-  }, [isLoaded, isSignedIn]);
+  }, [isLoaded, isSignedIn, session]);
 
   useEffect(() => {
     const stored = typeof window !== 'undefined' ? window.localStorage.getItem(STORAGE_KEY) : null;
@@ -104,7 +107,10 @@ export default function Home() {
     try {
       const res = await fetch("/api/transcripts", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session?.accessToken}`,
+        },
         body: JSON.stringify({
           title: fileName || "Untitled Transcript",
           content: transcript,
@@ -298,7 +304,13 @@ export default function Home() {
       setSummarization(true);
       form.append("enableSummarization", summarization ? "true" : "false");
   
-      const response = await fetch("/api/transcribe", { method: "POST", body: form });
+      const response = await fetch("/api/transcribe", {
+        method: "POST",
+        body: form,
+        headers: session?.accessToken
+          ? { Authorization: `Bearer ${session.accessToken}` }
+          : undefined,
+      });
         const contentType = response.headers.get("content-type") || "";
         const text   = await response.text();          // always grab raw
         if (!response.ok) {
@@ -616,7 +628,7 @@ export default function Home() {
                         speakersTranscript,
                       };
                       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-                      openSignIn();
+                      signIn("google");
                     } else {
                       handleSave();
                     }

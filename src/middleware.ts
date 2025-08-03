@@ -1,12 +1,17 @@
-import { clerkMiddleware } from "@clerk/nextjs/server";
+import { NextResponse, type NextRequest } from 'next/server';
+import { getToken } from 'next-auth/jwt';
 
-export const middleware = clerkMiddleware(); // ✅ dit is correct
+export async function middleware(req: NextRequest) {
+  // Just attempt to decode token so NextAuth can initialize
+  await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+  return NextResponse.next();
+}
 
 export const config = {
   matcher: [
-    "/((?!.+\\.[\\w]+$|_next).*)", // alles behalve statische bestanden
-    "/",                          // home route
-    "/api/(.*)",                  // api routes
-    "/transcripts/(.*)",          // jouw pagina's
+    '/((?!.+\\.[\\w]+$|_next).*)',
+    '/',
+    '/api/(.*)',
+    '/transcripts/(.*)',
   ],
 };

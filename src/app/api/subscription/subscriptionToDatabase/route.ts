@@ -1,7 +1,7 @@
 // src/app/api/subscription/route.ts
 
 import { NextRequest, NextResponse } from 'next/server';
-import { auth, clerkClient } from '@clerk/nextjs/server';
+import { requireAuth } from '@/lib/auth';
 import { getTursoClient } from '@/lib/turso';
 import crypto from 'crypto';
 
@@ -12,12 +12,8 @@ interface SubscriptionBody {
 }
 
 export async function GET(req: NextRequest) {
-  // 1) check auth
-//   const { userId } = await auth();
-//   if (!userId) {
-//     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
-//   }
-  const userId = "clerk_1234567890"; // Voor testdoeleinden, vervang dit met echte auth logica
+  const payload = await requireAuth(req.headers);
+  const userId = String(payload.sub);
   const db = getTursoClient();
 
   // 2) haal subscription(s) op voor deze user
@@ -30,12 +26,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  // 1) check auth
-//   const { userId } = await auth();
-//   if (!userId) {
-//     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
-//   }
-  const userId = "clerk_1234567890"; // Voor testdoeleinden, vervang dit met echte auth logica
+  const payload = await requireAuth(req.headers);
+  const userId = String(payload.sub);
 
   // 2) parse en valideer body
   let body: SubscriptionBody;

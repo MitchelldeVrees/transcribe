@@ -3,7 +3,7 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { useUser, useClerk } from "@clerk/nextjs";
+import { useSession, signIn, signOut } from "next-auth/react";
 import {
   FaHistory,
   FaHeadphones,
@@ -29,8 +29,9 @@ const SIDEBAR_WIDTH = 256;
 
 export default function Sidebar({ transcripts }: SidebarProps) {
   const [isOpen, setIsOpen] = useState(true);
-  const { user, isSignedIn } = useUser();
-  const { openSignIn, signOut } = useClerk();
+  const { data: session, status } = useSession();
+  const isSignedIn = status === "authenticated";
+  const user = session?.user;
   const toggleSidebar = () => setIsOpen((open) => !open);
 
   return (
@@ -104,7 +105,7 @@ export default function Sidebar({ transcripts }: SidebarProps) {
               Log in om je notules te bekijken en op te slaan.
             </p>
             <button
-              onClick={() => openSignIn({ redirectUrl: window.location.href })}
+              onClick={() => signIn("google")}
               className="w-full bg-white text-blue-800 py-2 px-4 rounded-md font-medium hover:bg-blue-700 transition-all"
             >
               <FaSignInAlt className="inline mr-2" /> Login
@@ -165,7 +166,7 @@ export default function Sidebar({ transcripts }: SidebarProps) {
         {isSignedIn && isOpen && (
           <div className="p-4 border-t border-blue-700 bg-blue-900">
             <div className="flex items-center space-x-2 mb-2">
-              <div className="font-medium">{user?.fullName}</div>
+              <div className="font-medium">{user?.name}</div>
               <div className="text-xs text-indigo-300">Free Plan</div>
             </div>
             <button

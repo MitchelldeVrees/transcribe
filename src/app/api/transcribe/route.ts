@@ -2,6 +2,7 @@
 // export const runtime = "edge";
 
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAuth } from '@/lib/auth';
 import OpenAI from 'openai';
 
 type QnaItem = { question: string; answer: string };
@@ -150,6 +151,7 @@ Gebruik Tailwind CSS classes. voor de styling van de samenvatting en actionpoint
 }
 
 export async function POST(request: NextRequest) {
+  await requireAuth(request.headers);
   // Debug environment variables
   console.log("/api/transcribe POST - ENV", {
     AZURE_FUNCTION_URL: AZURE_FUNCTION_URL || null,

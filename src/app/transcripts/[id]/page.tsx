@@ -7,12 +7,13 @@ import useSWR from "swr";
 import Sidebar, { Transcript } from "@/components/Sidebar";
 import ResultsSection from "@/components/ResultsSection";
 import { stopwords } from "../../stopwords";
-import { useUser } from "@clerk/nextjs";
+import { useSession } from "next-auth/react";
 
-const fetcher = (url: string) => fetch(url).then((r) => {
-  if (!r.ok) throw new Error(`Fetch error ${r.status}`);
-  return r.json();
-});
+const fetcher = (url: string, token: string) =>
+  fetch(url, { headers: { Authorization: `Bearer ${token}` } }).then((r) => {
+    if (!r.ok) throw new Error(`Fetch error ${r.status}`);
+    return r.json();
+  });
 
 interface TranscriptDetail {
   id: string;
@@ -28,8 +29,11 @@ interface TranscriptDetail {
 
 export default function TranscriptPage() {
   const { id } = useParams();
-  // Grab user info and loading state from Clerk
-  const { user, isLoaded, isSignedIn } = useUser();
+  // Grab session info from NextAuth
+  const { data: session, status } = useSession();
+  const isLoaded = status !== "loading";
+  const isSignedIn = status === "authenticated";
+  const user = session?.user;
   const MAX_TITLE_LENGTH = 50;
 
   // --- 1) SWR for sidebar list ---
@@ -38,9 +42,13 @@ export default function TranscriptPage() {
     isLoading: listLoading,
     error: listError,
     mutate: mutateList
-  } = useSWR(isLoaded && isSignedIn ? "/api/transcripts" : null, fetcher, {
-    revalidateOnFocus: false,
-  });
+  } = useSWR(
+    isLoaded && isSignedIn && session?.accessToken ? ["/api/transcripts", session.accessToken] : null,
+    ([url, token]) => fetcher(url, token!),
+    {
+      revalidateOnFocus: false,
+    }
+  );
 
   // --- 2) SWR for detail ---
   const {
@@ -49,8 +57,10 @@ export default function TranscriptPage() {
     error: detailError,
     mutate: mutateDetail
   } = useSWR(
-    isLoaded && isSignedIn && id ? `/api/transcripts/${id}` : null,
-    fetcher,
+    isLoaded && isSignedIn && id && session?.accessToken
+      ? [`/api/transcripts/${id}`, session.accessToken]
+      : null,
+    ([url, token]) => fetcher(url, token!),
     { revalidateOnFocus: false }
   );
 
@@ -90,7 +100,10 @@ export default function TranscriptPage() {
     try {
       const res = await fetch(`/api/transcripts/${id}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session?.accessToken}`,
+        },
         body: JSON.stringify({ title: titleInput }),
       });
       if (!res.ok) {
