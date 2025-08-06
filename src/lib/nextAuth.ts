@@ -5,16 +5,11 @@ import { SignJWT } from "jose";
 
 const secret = new TextEncoder().encode(process.env.BACKEND_JWT_SECRET!);
 
-/** ---- TEST SETTINGS ----
- * For testing:
- *   ACCESS_TOKEN_TTL_SECONDS = 20
- *   maxAge (session/jwt)     = 40
- * For production, consider:
- *   ACCESS_TOKEN_TTL_SECONDS = 15 * 60 (15m)
- *   maxAge                   = 30 * 24 * 60 * 60 (30d)
- */
-const ACCESS_TOKEN_TTL_SECONDS = 20;  // <- change to 15*60 after testing
-const ROTATE_BEFORE_EXP_SECONDS = 5;
+// JWT issued for backend requests is short‑lived (10 minutes) and refreshed
+// via NextAuth's session handling so users remain logged in without reauth.
+const ACCESS_TOKEN_TTL_SECONDS = 10 * 60; // 10 minutes
+// Refresh the token a minute before it expires to avoid race conditions.
+const ROTATE_BEFORE_EXP_SECONDS = 60;
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -25,10 +20,12 @@ export const authOptions: NextAuthOptions = {
   ],
   session: {
     strategy: "jwt",
-    maxAge: 40, // <- change to 30 days in prod
+    // Keep the session for 30 days even though the backend token rotates.
+    maxAge: 30 * 24 * 60 * 60,
   },
   jwt: {
-    maxAge: 40, // <- keep in sync with session for test
+    // Mirror session maxAge so the session provider can refresh the token.
+    maxAge: 30 * 24 * 60 * 60,
   },
   callbacks: {
     async jwt({ token, account, user }) {

@@ -1,9 +1,9 @@
 // src/app/api/auth/[...nextauth]/route.ts
 import NextAuth from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { authOptions } from '@/lib/nextAuth'
 
-// (Edge is the default runtime, so you can omit this if you like)
-export const runtime = 'edge'
+// NextAuth relies on Node.js APIs, so use the Node.js runtime.
+export const runtime = 'nodejs'
 
 // create the handler
 const handler = NextAuth(authOptions)
