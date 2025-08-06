@@ -9,6 +9,7 @@ import ResultsSection from "@/components/ResultsSection";
 import Swal from 'sweetalert2';
 import Link from "next/link";
 import { useSession, signIn } from "next-auth/react";
+import { countMeaningfulWords as countDutch } from "../lib/wordCountDutch";
 
 interface QnaItem {
   question: string;
@@ -63,6 +64,7 @@ export default function Home() {
   const audioRef = useRef<HTMLAudioElement>(null);
 
   useEffect(() => {
+
     if (isLoaded && isSignedIn && session?.accessToken) {
       fetch("/api/transcripts", {
         headers: { Authorization: `Bearer ${session.accessToken}` },
@@ -346,7 +348,7 @@ export default function Home() {
         Math.round((performance.now() - startTime) / 1000)
       );
 
-      setWordCount(data.text.split(/\s+/).length);
+      setWordCount(countDutch(data.text));
   
       // 6) Bereken woordfrequenties
       // 6a) Vind alle woorden (geen cijfers/punctie) of lege array
@@ -395,6 +397,8 @@ export default function Home() {
     setWordCount(0);
     setProcessingTime(0);
     setStage("upload");
+
+
   }
 
 

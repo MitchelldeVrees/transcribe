@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
 
   // Ensure user exists in DB
   const userRes = await db.execute(
-    'SELECT id FROM users WHERE subId = ?',
+    'SELECT * FROM users WHERE subId = ?',
     [subId]
   );
 
@@ -42,12 +42,12 @@ export async function GET(req: NextRequest) {
     );
     userIdDb = String(newUserRes.rows[0].id);
   }
-
   // Fetch transcripts
   const txRes = await db.execute(
-    'SELECT * FROM transcripts WHERE userId = ?',
-    [userIdDb]
+    'SELECT * FROM transcripts WHERE subId = ? ORDER BY created DESC',
+    [subId]
   );
+
 
   return NextResponse.json({
     user: { id: subId, email, name },

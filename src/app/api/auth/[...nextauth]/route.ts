@@ -1,41 +1,12 @@
-import NextAuth, { NextAuthOptions } from "next-auth";
-import GoogleProvider from "next-auth/providers/google";
-import { SignJWT } from "jose";
+// src/app/api/auth/[...nextauth]/route.ts
+import NextAuth from 'next-auth'
+import { authOptions } from '@/lib/auth'
 
-const secret = new TextEncoder().encode(process.env.BACKEND_JWT_SECRET!);
+// (Edge is the default runtime, so you can omit this if you like)
+export const runtime = 'edge'
 
-export const authOptions: NextAuthOptions = {
-  providers: [
-    GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-    }),
-  ],
-  session: {
-    strategy: "jwt",
-  },
-  callbacks: {
-    async jwt({ token, account, user }) {
-      if (account && user) {
-        token.accessToken = await new SignJWT({ sub: user.id, email: user.email })
-          .setProtectedHeader({ alg: "HS256" })
-          .setIssuedAt()
-          .setExpirationTime("1h")
-          .sign(secret);
-      }
-      return token;
-    },
-    async session({ session, token }) {
-      session.user = {
-        ...session.user,
-        id: token.sub as string,
-      };
-      session.accessToken = token.accessToken as string;
-      return session;
-    },
-  },
-  secret: process.env.NEXTAUTH_SECRET,
-};
+// create the handler
+const handler = NextAuth(authOptions)
 
-const handler = NextAuth(authOptions);
-export { handler as GET, handler as POST };
+// **only** these exports are allowed:
+export { handler as GET, handler as POST }

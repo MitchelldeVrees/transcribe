@@ -8,6 +8,8 @@ import Sidebar, { Transcript } from "@/components/Sidebar";
 import ResultsSection from "@/components/ResultsSection";
 import { stopwords } from "../../stopwords";
 import { useSession } from "next-auth/react";
+import DownloadModal from '../../../components/downloadModal';
+import { FaFileWord, FaFilePdf } from "react-icons/fa";
 
 const fetcher = (url: string, token: string) =>
   fetch(url, { headers: { Authorization: `Bearer ${token}` } }).then((r) => {
@@ -35,6 +37,11 @@ export default function TranscriptPage() {
   const isSignedIn = status === "authenticated";
   const user = session?.user;
   const MAX_TITLE_LENGTH = 50;
+
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalType, setModalType] = useState<'word'|'pdf'>('word');
+  
+
 
   // --- 1) SWR for sidebar list ---
   const {
@@ -217,7 +224,34 @@ export default function TranscriptPage() {
             timeStyle: "short",
           })}
         </p>
+        Exporteer naar:
 
+<div className="mb-4 flex space-x-2">
+        <button
+          onClick={() => { setModalType("word"); setModalOpen(true); }}
+          className="rounded-lg bg-blue-600 p-2 text-white hover:bg-blue-500"
+        >
+          <FaFileWord size={20} />
+        </button>
+        <button
+          onClick={() => { setModalType("pdf"); setModalOpen(true); }}
+          className="rounded-lg bg-blue-600 p-2 text-white hover:bg-blue-500"
+        >
+          <FaFilePdf size={20} />
+        </button>
+      </div>
+
+
+<DownloadModal
+  isOpen={modalOpen}
+  onClose={() => setModalOpen(false)}
+  title={transcript.title}
+  type={modalType}
+  transcript={transcript.content}
+  summary={transcript.summary || ''}
+  actionPoints={transcript.actionPoints || ''}
+  qna={transcript.qna || []}
+/>
         <ResultsSection
           audioDuration={transcript.audioLength}
           wordCount={transcript.content.split(/\s+/).length}
@@ -232,7 +266,8 @@ export default function TranscriptPage() {
           handleSave={() => {}}
           exportToWord={() => {}}
           handleNewTranscription={() => {}}
-        />
+          />
+
       </main>
     </div>
   );

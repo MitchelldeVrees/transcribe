@@ -15,7 +15,7 @@ async function authenticate(headers: Headers): Promise<string | null> {
       [subId]
     );
     if (userRes.rows.length === 0) return null;
-    return String(userRes.rows[0].id);
+    return String(subId);
   } catch {
     return null;
   }
@@ -34,6 +34,7 @@ export async function GET(
   if (!isValidUUID(transcriptId)) {
     return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
   }
+  
   const db = getTursoClient();
   const txRes = await db.execute(
     `SELECT 
@@ -47,7 +48,7 @@ export async function GET(
        length as timeLength,
        audioLength
      FROM transcripts
-     WHERE id = ? AND userId = ?`,
+     WHERE id = ? AND subId = ?`,
     [transcriptId, userId]
   );
 
@@ -106,7 +107,7 @@ export async function PATCH(
 
   const db = getTursoClient();
   await db.execute(
-    "UPDATE transcripts SET title = ? WHERE id = ? AND userId = ?",
+    "UPDATE transcripts SET title = ? WHERE id = ? AND subId = ?",
     [sanitized, transcriptId, userId]
   );
 
