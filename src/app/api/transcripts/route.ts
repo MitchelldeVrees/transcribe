@@ -9,6 +9,7 @@ import crypto from 'crypto'
 
 export async function GET(req: NextRequest) {
   const payload = await requireAuth(req.headers);
+  console.log(payload)
   const subId = String(payload.sub);
   const email = String(payload.email || '');
   const name = String(payload.name || '');
@@ -20,7 +21,7 @@ export async function GET(req: NextRequest) {
     'SELECT * FROM users WHERE subId = ?',
     [subId]
   );
-
+  console.log(subId)
   let userIdDb: string;
   let referralCode: string
 
