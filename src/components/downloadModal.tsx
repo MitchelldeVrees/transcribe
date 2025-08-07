@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Document, Packer, Paragraph } from "docx";
+import { Document, Packer, Paragraph, TextRun } from "docx";
 import { saveAs } from "file-saver";
 import { jsPDF } from "jspdf";
 
@@ -96,7 +96,14 @@ export default function DownloadModal({
 
       contentBlocks.forEach((block, idx) => {
         // Bold header paragraph
-        children.push(new Paragraph({ text: block.label, bold: true }));
+        children.push(new Paragraph({
+          children: [
+            new TextRun({
+              text: block.label,
+              bold: true,
+            }),
+          ],
+        }));
 
         // Splits op dubbele newline -> nieuwe paragrafen
         block.text.split(/\n{2,}/).forEach((para) => {
@@ -133,7 +140,7 @@ export default function DownloadModal({
         const paragraphs = block.text.split(/\n{2,}/);
         paragraphs.forEach((p, pIdx) => {
           const lines = pdf.splitTextToSize(p, maxWidth);
-          lines.forEach((line) => {
+          lines.forEach((line: string | string[]) => {
             pdf.text(line, left, y);
             y += 7;
             if (y > 280) {

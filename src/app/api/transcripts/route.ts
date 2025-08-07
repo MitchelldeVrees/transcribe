@@ -1,7 +1,7 @@
 // src/app/api/transcripts/route.ts
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAuth } from '@/lib/auth';
+import { requireAuth } from "@/lib/requireAuth"
 import { getTursoClient } from '@/lib/turso';
 import { sanitizeTitle } from '@/lib/validation';
 import { generateReferralCode } from '@/lib/referral'

@@ -1,7 +1,7 @@
 // src/app/api/subscription/route.ts
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAuth } from '@/lib/auth';
+import { requireAuth } from "@/lib/requireAuth"
 import { getTursoClient } from '@/lib/turso';
 import crypto from 'crypto';
 

@@ -1,7 +1,7 @@
 // src/app/api/createSubscription/route.ts
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAuth } from '@/lib/auth';
+import { requireAuth } from "@/lib/requireAuth"
 import Stripe from 'stripe';
 
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;

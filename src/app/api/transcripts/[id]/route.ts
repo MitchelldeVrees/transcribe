@@ -1,6 +1,6 @@
 // app/api/transcripts/[id]/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/auth";
+import { requireAuth } from "@/lib/requireAuth"
 import { getTursoClient } from "@/lib/turso";
 import { isValidUUID, sanitizeTitle } from "@/lib/validation";
 

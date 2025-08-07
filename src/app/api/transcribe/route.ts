@@ -2,7 +2,7 @@
 // export const runtime = "edge";
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAuth } from '@/lib/auth';
+import { requireAuth } from "@/lib/requireAuth"
 import OpenAI from 'openai';
 
 type QnaItem = { question: string; answer: string };
