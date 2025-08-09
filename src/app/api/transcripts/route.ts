@@ -1,31 +1,27 @@
 // src/app/api/transcripts/route.ts
 
 import { NextRequest, NextResponse } from 'next/server';
-import { auth, clerkClient } from '@clerk/nextjs/server';
+import { requireAuth } from "@/lib/requireAuth"
 import { getTursoClient } from '@/lib/turso';
 import { sanitizeTitle } from '@/lib/validation';
 import { generateReferralCode } from '@/lib/referral'
+import crypto from 'crypto'
 
 export async function GET(req: NextRequest) {
-  const { userId } = await auth();
-  console.log(userId);
-  if (!userId) {
-    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
-  }
-
-  const user = await (await clerkClient()).users.getUser(userId);
-  const email = user.emailAddresses[0]?.emailAddress || '';
-  const name = user.firstName + ' ' + (user.lastName || '');
-  const subId = userId;
+  const payload = await requireAuth(req.headers);
+  console.log(payload)
+  const subId = String(payload.sub);
+  const email = String(payload.email || '');
+  const name = String(payload.name || '');
 
   const db = getTursoClient();
 
   // Ensure user exists in DB
   const userRes = await db.execute(
-    'SELECT id FROM users WHERE subId = ?',
+    'SELECT * FROM users WHERE subId = ?',
     [subId]
   );
-
+  console.log(subId)
   let userIdDb: string;
   let referralCode: string
 
@@ -47,12 +43,12 @@ export async function GET(req: NextRequest) {
     );
     userIdDb = String(newUserRes.rows[0].id);
   }
-
   // Fetch transcripts
   const txRes = await db.execute(
-    'SELECT * FROM transcripts WHERE userId = ?',
-    [userIdDb]
+    'SELECT * FROM transcripts WHERE subId = ? ORDER BY created DESC',
+    [subId]
   );
+
 
   return NextResponse.json({
     user: { id: subId, email, name },
@@ -61,15 +57,10 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const { userId } = await auth();
-
-  if (!userId) {
-    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
-  }
-
-  const user = await (await clerkClient()).users.getUser(userId);
-  const email = user.emailAddresses[0]?.emailAddress || '';
-  const name = user.firstName + ' ' + (user.lastName || '');
+  const payload = await requireAuth(req.headers);
+  const userId = String(payload.sub);
+  const email = String(payload.email || '');
+  const name = String(payload.name || '');
 
   let body: any;
   try {

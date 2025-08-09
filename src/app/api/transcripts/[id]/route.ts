@@ -1,29 +1,31 @@
 // app/api/transcripts/[id]/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { auth, clerkClient } from "@clerk/nextjs/server";
+import { requireAuth } from "@/lib/requireAuth"
 import { getTursoClient } from "@/lib/turso";
 import { isValidUUID, sanitizeTitle } from "@/lib/validation";
 
 // Helper to authenticate and get internal DB user ID
-async function authenticate(): Promise<string | null> {
-  const { userId } =  await auth();
-  if (!userId) return null;
-
-  const db = getTursoClient();
-  const userRes = await db.execute(
-    "SELECT id FROM users WHERE subId = ?",
-    [userId]
-  );
-  if (userRes.rows.length === 0) return null;
-
-  return String(userRes.rows[0].id);
+async function authenticate(headers: Headers): Promise<string | null> {
+  try {
+    const payload = await requireAuth(headers);
+    const subId = String(payload.sub);
+    const db = getTursoClient();
+    const userRes = await db.execute(
+      "SELECT id FROM users WHERE subId = ?",
+      [subId]
+    );
+    if (userRes.rows.length === 0) return null;
+    return String(subId);
+  } catch {
+    return null;
+  }
 }
 
 export async function GET(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
-  const userId = await authenticate();
+  const userId = await authenticate(request.headers);
   if (!userId) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
@@ -32,6 +34,7 @@ export async function GET(
   if (!isValidUUID(transcriptId)) {
     return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
   }
+  
   const db = getTursoClient();
   const txRes = await db.execute(
     `SELECT 
@@ -45,7 +48,7 @@ export async function GET(
        length as timeLength,
        audioLength
      FROM transcripts
-     WHERE id = ? AND userId = ?`,
+     WHERE id = ? AND subId = ?`,
     [transcriptId, userId]
   );
 
@@ -82,7 +85,7 @@ export async function PATCH(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
-  const userId = await authenticate();
+  const userId = await authenticate(request.headers);
   if (!userId) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
@@ -104,7 +107,7 @@ export async function PATCH(
 
   const db = getTursoClient();
   await db.execute(
-    "UPDATE transcripts SET title = ? WHERE id = ? AND userId = ?",
+    "UPDATE transcripts SET title = ? WHERE id = ? AND subId = ?",
     [sanitized, transcriptId, userId]
   );
 
@@ -115,7 +118,7 @@ export async function DELETE(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
-  const userId = await authenticate();
+  const userId = await authenticate(request.headers);
   if (!userId) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }

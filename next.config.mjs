@@ -28,7 +28,7 @@ const nextConfig = {
 
   eslint: { ignoreDuringBuilds: true },
 
-  // ② Include all your existing envs … plus the two Clerk keys
+  // ② Include all your existing envs … plus NextAuth keys
   env: {
     OPENAI_API_KEY: process.env.OPENAI_API_KEY,
     GROK_API_KEY: process.env.GROK_API_KEY,
@@ -40,10 +40,6 @@ const nextConfig = {
     CF_API_TOKEN: process.env.CF_API_TOKEN,
     TURSO_URL: process.env.TURSO_URL,
     TURSO_AUTH_TOKEN: process.env.TURSO_AUTH_TOKEN,
-
-    // ← Add these two:
-    NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
-    CLERK_SECRET_KEY:            process.env.CLERK_SECRET_KEY,
   },
 
   assetPrefix: '',

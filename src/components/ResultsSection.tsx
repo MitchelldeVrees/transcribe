@@ -4,7 +4,7 @@
 import React, { useMemo, useState } from "react"; // NEW: useState, useMemo
 import DOMPurify from "dompurify";
 import { FaCopy } from "react-icons/fa";
-import { useUser } from "@clerk/nextjs";
+import { useSession } from "next-auth/react";
 
 
 interface WordFreq { word: string; count: number; }
@@ -224,7 +224,8 @@ export default function ResultsSection({
   exportToWord,
   handleNewTranscription,
 }: ResultsSectionProps) {
-  const { isSignedIn } = useUser();
+  const { status } = useSession();
+  const isSignedIn = status === "authenticated";
 
   // NEW: pre-split transcript once
   const sentences = useMemo(() => splitIntoSentences(transcript), [transcript]);

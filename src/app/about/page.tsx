@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import Sidebar, { Transcript } from "@/components/Sidebar";
-import { useUser } from "@clerk/nextjs";
+import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
@@ -64,13 +64,17 @@ const featureList = [
 ];
 
 export default function AboutPage() {
-  const { isLoaded, isSignedIn } = useUser();
+  const { data: session, status } = useSession();
+  const isLoaded = status !== "loading";
+  const isSignedIn = status === "authenticated";
   const [transcripts, setTranscripts] = useState<Transcript[]>([]);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (isLoaded && isSignedIn) {
-      fetch("/api/transcripts")
+    if (isLoaded && isSignedIn && session?.accessToken) {
+      fetch("/api/transcripts", {
+        headers: { Authorization: `Bearer ${session.accessToken}` },
+      })
         .then((res) => {
           if (!res.ok) throw new Error("AUTH_ERROR");
           return res.json();
@@ -83,7 +87,7 @@ export default function AboutPage() {
           );
         });
     }
-  }, [isLoaded, isSignedIn]);
+  }, [isLoaded, isSignedIn, session]);
 
   if (!isLoaded) {
     return (

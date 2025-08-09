@@ -7,12 +7,15 @@ import useSWR from "swr";
 import Sidebar, { Transcript } from "@/components/Sidebar";
 import ResultsSection from "@/components/ResultsSection";
 import { stopwords } from "../../stopwords";
-import { useUser } from "@clerk/nextjs";
+import { useSession } from "next-auth/react";
+import DownloadModal from '../../../components/downloadModal';
+import { FaFileWord, FaFilePdf } from "react-icons/fa";
 
-const fetcher = (url: string) => fetch(url).then((r) => {
-  if (!r.ok) throw new Error(`Fetch error ${r.status}`);
-  return r.json();
-});
+const fetcher = (url: string, token: string) =>
+  fetch(url, { headers: { Authorization: `Bearer ${token}` } }).then((r) => {
+    if (!r.ok) throw new Error(`Fetch error ${r.status}`);
+    return r.json();
+  });
 
 interface TranscriptDetail {
   id: string;
@@ -28,9 +31,17 @@ interface TranscriptDetail {
 
 export default function TranscriptPage() {
   const { id } = useParams();
-  // Grab user info and loading state from Clerk
-  const { user, isLoaded, isSignedIn } = useUser();
+  // Grab session info from NextAuth
+  const { data: session, status } = useSession();
+  const isLoaded = status !== "loading";
+  const isSignedIn = status === "authenticated";
+  const user = session?.user;
   const MAX_TITLE_LENGTH = 50;
+
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalType, setModalType] = useState<'word'|'pdf'>('word');
+  
+
 
   // --- 1) SWR for sidebar list ---
   const {
@@ -38,9 +49,13 @@ export default function TranscriptPage() {
     isLoading: listLoading,
     error: listError,
     mutate: mutateList
-  } = useSWR(isLoaded && isSignedIn ? "/api/transcripts" : null, fetcher, {
-    revalidateOnFocus: false,
-  });
+  } = useSWR(
+    isLoaded && isSignedIn && session?.accessToken ? ["/api/transcripts", session.accessToken] : null,
+    ([url, token]) => fetcher(url, token!),
+    {
+      revalidateOnFocus: false,
+    }
+  );
 
   // --- 2) SWR for detail ---
   const {
@@ -49,8 +64,10 @@ export default function TranscriptPage() {
     error: detailError,
     mutate: mutateDetail
   } = useSWR(
-    isLoaded && isSignedIn && id ? `/api/transcripts/${id}` : null,
-    fetcher,
+    isLoaded && isSignedIn && id && session?.accessToken
+      ? [`/api/transcripts/${id}`, session.accessToken]
+      : null,
+    ([url, token]) => fetcher(url, token!),
     { revalidateOnFocus: false }
   );
 
@@ -90,7 +107,10 @@ export default function TranscriptPage() {
     try {
       const res = await fetch(`/api/transcripts/${id}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session?.accessToken}`,
+        },
         body: JSON.stringify({ title: titleInput }),
       });
       if (!res.ok) {
@@ -204,7 +224,34 @@ export default function TranscriptPage() {
             timeStyle: "short",
           })}
         </p>
+        Exporteer naar:
 
+<div className="mb-4 flex space-x-2">
+        <button
+          onClick={() => { setModalType("word"); setModalOpen(true); }}
+          className="rounded-lg bg-blue-600 p-2 text-white hover:bg-blue-500"
+        >
+          <FaFileWord size={20} />
+        </button>
+        <button
+          onClick={() => { setModalType("pdf"); setModalOpen(true); }}
+          className="rounded-lg bg-blue-600 p-2 text-white hover:bg-blue-500"
+        >
+          <FaFilePdf size={20} />
+        </button>
+      </div>
+
+
+<DownloadModal
+  isOpen={modalOpen}
+  onClose={() => setModalOpen(false)}
+  title={transcript.title}
+  type={modalType}
+  transcript={transcript.content}
+  summary={transcript.summary || ''}
+  actionPoints={transcript.actionPoints || ''}
+  qna={transcript.qna || []}
+/>
         <ResultsSection
           audioDuration={transcript.audioLength}
           wordCount={transcript.content.split(/\s+/).length}
@@ -219,7 +266,8 @@ export default function TranscriptPage() {
           handleSave={() => {}}
           exportToWord={() => {}}
           handleNewTranscription={() => {}}
-        />
+          />
+
       </main>
     </div>
   );

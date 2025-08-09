@@ -1,7 +1,7 @@
 // src/app/api/mobileBackend/points/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { getTursoClient }       from '@/lib/turso'
-import { requireAuth }          from '@/lib/auth'
+import { requireAuth } from "@/lib/requireAuth"
 
 export async function POST(req: NextRequest) {
   try {

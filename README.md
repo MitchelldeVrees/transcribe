@@ -8,11 +8,13 @@ npm run deploy
 ## Environment configuration
 
 Create a `.env.local` file for development and `.env.production` for your
-production deployment. At minimum these files should contain your Clerk keys:
+production deployment. With NextAuth you'll need at least the following keys:
 
 ```
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_xxxx
-CLERK_SECRET_KEY=sk_test_xxxx
+GOOGLE_CLIENT_ID=your_google_client_id
+GOOGLE_CLIENT_SECRET=your_google_client_secret
+NEXTAUTH_SECRET=complex_random
+BACKEND_JWT_SECRET=another_secret
 ```
 
 Use your real production keys in the production file. Next.js will load the

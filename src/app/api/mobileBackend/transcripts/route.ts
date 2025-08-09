@@ -2,7 +2,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getTursoClient }       from '@/lib/turso';
-import { requireAuth }          from '@/lib/auth';
+import { requireAuth } from "@/lib/requireAuth"
 
 export async function GET(req: NextRequest) {
   try {

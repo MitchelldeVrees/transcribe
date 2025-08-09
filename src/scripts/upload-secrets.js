@@ -13,12 +13,20 @@ const secretKeys = [
   "OPENAI_API_KEY",
   "GROK_API_KEY",
   "GROK_BASE_URL",
+  // NextAuth v5 canonical envs
+  "AUTH_URL",
+  "AUTH_GOOGLE_ID",
+  "AUTH_GOOGLE_SECRET",
+  "AUTH_SECRET",
+  // Backward-compat vars (if you still have them locally)
   "GOOGLE_CLIENT_ID",
   "GOOGLE_CLIENT_SECRET",
   "NEXTAUTH_SECRET",
+  // App specific
   "CF_API_TOKEN",
   "TURSO_URL",
   "TURSO_AUTH_TOKEN",
+  "BACKEND_JWT_SECRET",
 ];
 
 for (const key of secretKeys) {
