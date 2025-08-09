@@ -3,6 +3,8 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+
 import { useSession, signIn, signOut } from "next-auth/react";
 import {
   FaHistory,
@@ -34,6 +36,9 @@ export default function Sidebar({ transcripts }: SidebarProps) {
   const user = session?.user;
   const toggleSidebar = () => setIsOpen((open) => !open);
 
+  const router = useRouter();
+
+  
   return (
     <>
       {/* Hamburger / Close button */}
@@ -110,6 +115,7 @@ export default function Sidebar({ transcripts }: SidebarProps) {
             >
               <FaSignInAlt className="inline mr-2" /> Login
             </button>
+            
           </div>
         )}
 
@@ -170,11 +176,16 @@ export default function Sidebar({ transcripts }: SidebarProps) {
               <div className="text-xs text-indigo-300">Free Plan</div>
             </div>
             <button
-              onClick={() => signOut().catch((err) => console.error("Sign-out failed", err))}
-              className="text-indigo-300 hover:text-white"
-            >
-              <FaSignOutAlt className="inline mr-1" /> Logout
-            </button>
+      onClick={async () => {
+        // don’t auto-redirect so we can refresh UI first
+        await signOut({ redirect: false });
+        router.replace("/");  // where you want them after logout
+        router.refresh();      // revalidate server components / session
+      }}
+      className="text-indigo-300 hover:text-white"
+    >
+      <FaSignOutAlt className="inline mr-1" /> Logout
+    </button>
           </div>
         )}
       </motion.aside>
