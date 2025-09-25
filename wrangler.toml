@@ -1,0 +1,19 @@
+name = "transcribe"
+main = ".open-next/worker.js"
+compatibility_date = "2025-04-01"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = false
+
+account_id = "d225cef34058832dc6db839b99faf1ab"
+zone_id = "7ce83452d7e1003fd3bfa54d6073da75"
+routes = ["www.luisterslim.nl/*", "luisterslim.nl/*"]
+minify = true
+upload_source_maps = true
+
+[assets]
+  directory = ".open-next/assets"
+  binding   = "ASSETS"
+
+[observability]
+  enabled = true
+
