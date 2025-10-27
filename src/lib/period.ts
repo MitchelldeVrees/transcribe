@@ -30,11 +30,17 @@ export function currentPeriod(timezone: string, renew_day: number | null) {
   // End is next month’s boundary @ renew_day
   const next = periodStart.plus({ months: 1 });
 
+  const startIso = periodStart.toUTC().toISO();
+  const endIso = next.toUTC().toISO();
+  if (!startIso || !endIso) {
+    throw new Error('Unable to compute period boundaries');
+  }
+
   return {
     periodId,
-    startIso: periodStart.toUTC().toISO(),
-    endIso: next.toUTC().toISO(),
+    startIso,
+    endIso,
     timezone: tz,
-    renewDay: rd
+    renewDay: rd,
   };
 }

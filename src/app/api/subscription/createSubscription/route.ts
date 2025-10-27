@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from "@/lib/requireAuth"
 import Stripe from 'stripe';
 
-const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+const stripeSecretKey = 'sk_test_51IOhNJCNUsKHlBxZiNASQEmkYEA3CGEypVMmvCvroXrlg52kSviRRm6OcofT5cxBf7J7fZHDdj0AMXSLXQqzndOp00ghiy4vYo';
 if (!stripeSecretKey) {
   throw new Error('Missing STRIPE_SECRET_KEY in environment');
 }

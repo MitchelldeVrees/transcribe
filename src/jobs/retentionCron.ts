@@ -5,9 +5,11 @@ import {
   ensureRetentionSetting,
   ensureRetentionTables,
   recordRetentionAuditLog,
-  resolvePlanInfo,
   RetentionSettingRow,
+  selectRetentionOptionForPlan,
+  toCanonicalPlanCode,
   updateSchedulerMetadata,
+  upsertRetentionSelection,
 } from '@/lib/retentionPolicy';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -39,10 +41,19 @@ export async function runRetentionCron(now = new Date()): Promise<CronResult> {
     const accountId = normalizeAccountId(row);
     if (!accountId) continue;
 
-    const planCode = String(row.plan_code || 'free');
-    const plan = resolvePlanInfo(planCode);
-    const setting = await ensureRetentionSetting(db, accountId, plan.code);
-    const retentionDays = normalizeRetentionDays(setting, plan.code);
+    const rawPlanCode = String(row.plan_code || 'free');
+    const canonicalPlan = toCanonicalPlanCode(rawPlanCode);
+    let setting = await ensureRetentionSetting(db, accountId, canonicalPlan);
+    const selectedOption = selectRetentionOptionForPlan(canonicalPlan, setting.option_id);
+    if (selectedOption.id !== setting.option_id) {
+      setting = await upsertRetentionSelection(db, {
+        accountId,
+        planCode: canonicalPlan,
+        option: selectedOption,
+      });
+    }
+
+    const retentionDays = normalizeRetentionDays(setting, canonicalPlan);
     if (retentionDays <= 0) {
       await updateSchedulerMetadata(db, accountId, {
         nextDeletionAt: null,

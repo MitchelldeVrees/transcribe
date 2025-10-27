@@ -6,13 +6,14 @@ export type PlanInfo = {
   description?: string;
 };
 
+export type CanonicalPlanCode = 'free' | 'basic' | 'premium';
+
 export type RetentionOption = {
   id: string;
   label: string;
   days: number;
   description?: string;
-  planCodes: string[];
-  lockedForPlans: string[];
+  planCodes: CanonicalPlanCode[];
 };
 
 export type RetentionSettingRow = {
@@ -46,50 +47,56 @@ const PLAN_CATALOG: Record<string, PlanInfo> = {
   pro:         { code: 'pro',         name: 'Pro' },
   team:        { code: 'team',        name: 'Team' },
   enterprise:  { code: 'enterprise',  name: 'Enterprise' },
+  basic:       { code: 'basic',       name: 'Basic' },
+  premium:     { code: 'premium',     name: 'Premium' },
+};
+
+const CANONICAL_PLAN_NAMES: Record<CanonicalPlanCode, string> = {
+  free: 'Free',
+  basic: 'Basic',
+  premium: 'Premium',
+};
+
+const PLAN_CANONICAL_MAP: Record<string, CanonicalPlanCode> = {
+  free: 'free',
+  starter: 'basic',
+  basic: 'basic',
+  pro: 'premium',
+  premium: 'premium',
+  team: 'premium',
+  enterprise: 'premium',
 };
 
 const DEFAULT_PLAN = PLAN_CATALOG.free;
-
-const DEFAULT_OPTION_BY_PLAN: Record<string, string> = {
-  free: '30d',
-  starter: '30d',
-  pro: '90d',
-  team: '180d',
-  enterprise: '365d',
-};
 
 export const RETENTION_OPTIONS: RetentionOption[] = [
   {
     id: '30d',
     label: '30 dagen',
     days: 30,
-    description: 'Standaard voor Free & Starter accounts (AVG-baseline).',
-    planCodes: ['free', 'starter', 'pro', 'team', 'enterprise'],
-    lockedForPlans: [],
+    description: 'Standaard-herinnering van 30 dagen voor elk account.',
+    planCodes: ['free', 'basic', 'premium'],
   },
   {
     id: '90d',
     label: '90 dagen',
     days: 90,
     description: 'Bewaar transcripts voor een kwartaal voor audits.',
-    planCodes: ['pro', 'team', 'enterprise'],
-    lockedForPlans: ['free', 'starter'],
+    planCodes: ['basic', 'premium'],
   },
   {
     id: '180d',
     label: '180 dagen',
     days: 180,
     description: 'Halve-jaar retention voor teams met langere projecten.',
-    planCodes: ['team', 'enterprise'],
-    lockedForPlans: ['free', 'starter', 'pro'],
+    planCodes: ['basic', 'premium'],
   },
   {
     id: '365d',
     label: '365 dagen',
     days: 365,
-    description: 'Volledig jaar archief (vereist Enterprise).',
-    planCodes: ['enterprise'],
-    lockedForPlans: ['free', 'starter', 'pro', 'team'],
+    description: 'Volledig jaar archief (vereist Premium-plan).',
+    planCodes: ['premium'],
   },
 ];
 
@@ -98,10 +105,20 @@ let tablesEnsured = false;
 export function resolvePlanInfo(code?: string | null): PlanInfo {
   const normalized = String(code || '').trim().toLowerCase();
   if (!normalized) return DEFAULT_PLAN;
-  return PLAN_CATALOG[normalized] ?? {
+  return PLAN_CATALOG[normalized] ?? PLAN_CATALOG[toCanonicalPlanCode(normalized)] ?? {
     code: normalized,
     name: normalized.charAt(0).toUpperCase() + normalized.slice(1),
   };
+}
+
+export function toCanonicalPlanCode(code?: string | null): CanonicalPlanCode {
+  const normalized = String(code || '').trim().toLowerCase();
+  if (!normalized) return 'free';
+  return PLAN_CANONICAL_MAP[normalized] ?? 'free';
+}
+
+export function canonicalPlanName(code: CanonicalPlanCode): string {
+  return CANONICAL_PLAN_NAMES[code];
 }
 
 export function findRetentionOption(optionId?: string | null): RetentionOption | undefined {
@@ -110,14 +127,44 @@ export function findRetentionOption(optionId?: string | null): RetentionOption |
 }
 
 export function defaultRetentionOption(planCode?: string | null): RetentionOption {
-  const plan = resolvePlanInfo(planCode);
-  const fallbackId = DEFAULT_OPTION_BY_PLAN[plan.code] || '30d';
-  return findRetentionOption(fallbackId) ?? RETENTION_OPTIONS[0];
+  const canonical = toCanonicalPlanCode(planCode);
+  const allowed = RETENTION_OPTIONS.filter((opt) => opt.planCodes.includes(canonical));
+  if (!allowed.length) return RETENTION_OPTIONS[0];
+  return allowed.sort((a, b) => a.days - b.days)[0];
 }
 
 export function optionLockedForPlan(option: RetentionOption, planCode?: string | null): boolean {
-  const plan = resolvePlanInfo(planCode);
-  return option.lockedForPlans.includes(plan.code);
+  const canonical = toCanonicalPlanCode(planCode);
+  return !option.planCodes.includes(canonical);
+}
+
+export function selectRetentionOptionForPlan(
+  planCode: string | null | undefined,
+  preferredOptionId?: string | null
+): RetentionOption {
+  const canonical = toCanonicalPlanCode(planCode);
+  const allowed = RETENTION_OPTIONS
+    .filter((opt) => opt.planCodes.includes(canonical))
+    .sort((a, b) => a.days - b.days);
+  if (!allowed.length) {
+    return RETENTION_OPTIONS[0];
+  }
+
+  if (preferredOptionId) {
+    const preferred = findRetentionOption(preferredOptionId);
+    if (preferred && !optionLockedForPlan(preferred, canonical)) {
+      return preferred;
+    }
+    if (preferred) {
+      for (let i = allowed.length - 1; i >= 0; i -= 1) {
+        if (allowed[i].days <= preferred.days) {
+          return allowed[i];
+        }
+      }
+    }
+  }
+
+  return allowed[0];
 }
 
 export async function ensureRetentionTables(db: Client) {
@@ -161,7 +208,7 @@ function mapSettingRow(row: any | undefined): RetentionSettingRow | null {
   if (!row) return null;
   return {
     account_id: String(row.account_id ?? row.accountId ?? ''),
-    plan_code: String(row.plan_code ?? row.planCode ?? 'free'),
+    plan_code: toCanonicalPlanCode(row.plan_code ?? row.planCode ?? 'free'),
     option_id: String(row.option_id ?? row.optionId ?? ''),
     retention_days: Number(row.retention_days ?? row.retentionDays ?? 0),
     updated_at: row.updated_at ?? row.updatedAt ?? null,
@@ -206,14 +253,15 @@ export async function ensureRetentionSetting(
   accountId: string,
   planCode: string
 ): Promise<RetentionSettingRow> {
+  const canonicalPlan = toCanonicalPlanCode(planCode);
   const existing = await getRetentionSetting(db, accountId);
   if (existing) return existing;
-  const option = defaultRetentionOption(planCode);
+  const option = defaultRetentionOption(canonicalPlan);
   await db.execute(
     `INSERT INTO user_retention_settings
        (account_id, plan_code, option_id, retention_days, updated_at, deletion_window_days)
      VALUES (?, ?, ?, ?, STRFTIME('%Y-%m-%dT%H:%M:%fZ','now'), ?)`,
-    [accountId, planCode, option.id, option.days, option.days]
+    [accountId, canonicalPlan, option.id, option.days, option.days]
   );
   return (await getRetentionSetting(db, accountId))!;
 }
@@ -222,6 +270,7 @@ export async function upsertRetentionSelection(
   db: Client,
   params: { accountId: string; planCode: string; option: RetentionOption }
 ): Promise<RetentionSettingRow> {
+  const canonicalPlan = toCanonicalPlanCode(params.planCode);
   await ensureRetentionTables(db);
   await db.execute(
     `INSERT INTO user_retention_settings
@@ -234,7 +283,7 @@ export async function upsertRetentionSelection(
        retention_days = excluded.retention_days,
        updated_at = STRFTIME('%Y-%m-%dT%H:%M:%fZ','now'),
        deletion_window_days = excluded.deletion_window_days`,
-    [params.accountId, params.planCode, params.option.id, params.option.days, params.option.days]
+    [params.accountId, canonicalPlan, params.option.id, params.option.days, params.option.days]
   );
   return (await getRetentionSetting(db, params.accountId))!;
 }
@@ -326,15 +375,15 @@ export async function updateSchedulerMetadata(
 }
 
 export function optionPayloadForPlan(planCode: string) {
-  const defaultOption = defaultRetentionOption(planCode);
+  const canonical = toCanonicalPlanCode(planCode);
+  const defaultOption = defaultRetentionOption(canonical);
   return RETENTION_OPTIONS.map((option) => ({
     id: option.id,
     label: option.label,
     days: option.days,
     description: option.description ?? null,
     planCodes: option.planCodes,
-    lockedForPlans: option.lockedForPlans,
-    locked: optionLockedForPlan(option, planCode),
+    locked: optionLockedForPlan(option, canonical),
     defaultForPlan: defaultOption.id === option.id,
   }));
 }

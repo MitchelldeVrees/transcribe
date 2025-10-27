@@ -1,33 +1,64 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getTursoClient } from '@/lib/turso';
 import {
-  defaultRetentionOption,
+  canonicalPlanName,
   ensureRetentionSetting,
   fetchRetentionAuditLog,
   findRetentionOption,
   optionLockedForPlan,
   optionPayloadForPlan,
-  resolvePlanInfo,
+  selectRetentionOptionForPlan,
+  toCanonicalPlanCode,
   upsertRetentionSelection,
+  type CanonicalPlanCode,
 } from '@/lib/retentionPolicy';
 import { requireAuth, TokenExpiredError, UnauthorizedError } from '@/lib/requireAuth';
 
-async function loadPlanCode(db: ReturnType<typeof getTursoClient>, accountId: string) {
-  const res = await db.execute(
+async function loadPlan(
+  db: ReturnType<typeof getTursoClient>,
+  accountId: string
+): Promise<{ code: CanonicalPlanCode; name: string }> {
+  const subRes = await db.execute(
     `SELECT plan_code
-       FROM user_plans
-      WHERE subId = ?
+       FROM mobile_subscriptions
+      WHERE account_id = ?
       LIMIT 1`,
     [accountId]
   );
-  return String((res.rows[0] as any)?.plan_code || 'free');
+
+  let raw = String((subRes.rows[0] as any)?.plan_code || '');
+
+  if (!raw) {
+    const planRes = await db.execute(
+      `SELECT plan_code
+         FROM user_plans
+        WHERE subId = ?
+        LIMIT 1`,
+      [accountId]
+    );
+    raw = String((planRes.rows[0] as any)?.plan_code || 'free');
+  }
+
+  const canonical = toCanonicalPlanCode(raw) as CanonicalPlanCode;
+  return {
+    code: canonical,
+    name: canonicalPlanName(canonical),
+  };
 }
 
 async function buildPayload(db: ReturnType<typeof getTursoClient>, accountId: string) {
-  const planCode = await loadPlanCode(db, accountId);
-  const plan = resolvePlanInfo(planCode);
-  const setting = await ensureRetentionSetting(db, accountId, plan.code);
-  const option = findRetentionOption(setting.option_id) ?? defaultRetentionOption(plan.code);
+  const plan = await loadPlan(db, accountId);
+  let setting = await ensureRetentionSetting(db, accountId, plan.code);
+  let option = selectRetentionOptionForPlan(plan.code, setting.option_id);
+
+  if (option.id !== setting.option_id) {
+    setting = await upsertRetentionSelection(db, {
+      accountId,
+      planCode: plan.code,
+      option,
+    });
+  }
+
   const options = optionPayloadForPlan(plan.code);
   const auditLog = await fetchRetentionAuditLog(db, accountId, 25);
   const auditReportUrl =
@@ -39,7 +70,6 @@ async function buildPayload(db: ReturnType<typeof getTursoClient>, accountId: st
     plan: {
       code: plan.code,
       name: plan.name,
-      description: plan.description ?? null,
     },
     options,
     currentPolicy: {
@@ -48,7 +78,7 @@ async function buildPayload(db: ReturnType<typeof getTursoClient>, accountId: st
       days: option.days,
       description: option.description ?? null,
       locked: optionLockedForPlan(option, plan.code),
-      retentionDays: setting.retention_days,
+      retentionDays: option.days,
       updatedAt: setting.updated_at,
     },
     nextDeletionAt: setting.next_deletion_at,
@@ -99,8 +129,7 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: 'optionId required' }, { status: 400 });
     }
 
-    const planCode = await loadPlanCode(db, me.sub);
-    const plan = resolvePlanInfo(planCode);
+    const plan = await loadPlan(db, me.sub);
     const option = findRetentionOption(optionId);
     if (!option) {
       return NextResponse.json({ error: 'Unknown retention option' }, { status: 400 });

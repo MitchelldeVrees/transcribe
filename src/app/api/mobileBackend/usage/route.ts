@@ -3,6 +3,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getTursoClient } from '@/lib/turso';
 import { requireAuth, TokenExpiredError, UnauthorizedError } from '@/lib/requireAuth';
 import { currentPeriod } from '@/lib/period';
+import { getUsageSnapshot } from '@/lib/billing';
+
+const MINUTE_MS = 60_000;
 
 export async function GET(req: NextRequest) {
   try {
@@ -22,6 +25,7 @@ export async function GET(req: NextRequest) {
     const renew_day = Number(plan?.renew_day ?? 1);
     const timezone = String(plan?.timezone || 'UTC');
     const period = currentPeriod(timezone, renew_day);
+    const usageSnapshot = await getUsageSnapshot(db, me.sub);
 
     // Ensure usage row for this period
     await db.execute(
@@ -36,7 +40,8 @@ export async function GET(req: NextRequest) {
       [me.sub, period.periodId]
     );
     const used_ms = Number((usedRes.rows[0] as any)?.used_ms ?? 0);
-    const remaining_ms = Math.max(monthly_quota_ms - used_ms, 0);
+    const total_quota_ms = usageSnapshot.quotaMinutes * MINUTE_MS;
+    const remaining_ms = Math.max(total_quota_ms - used_ms, 0);
 
     // Details (positive debits this period)
     const detailsRes = await db.execute(
@@ -69,12 +74,13 @@ export async function GET(req: NextRequest) {
     });
 
     // Convenience minute fields + pct
-    const toMin = (ms: number) => Math.round(ms / 60000);
-    const quota_minutes     = toMin(monthly_quota_ms);
-    const used_minutes      = toMin(used_ms);
-    const remaining_minutes = toMin(remaining_ms);
-    const used_pct = monthly_quota_ms > 0
-      ? Math.min(100, Math.round((used_ms / monthly_quota_ms) * 100))
+    const quota_minutes      = usageSnapshot.quotaMinutes;
+    const used_minutes       = usageSnapshot.usedMinutes;
+    const remaining_minutes  = usageSnapshot.remainingMinutes;
+    const bonus_minutes      = usageSnapshot.bonusMinutes;
+    const base_quota_minutes = usageSnapshot.baseQuotaMinutes;
+    const used_pct = total_quota_ms > 0
+      ? Math.min(100, Math.round((used_ms / total_quota_ms) * 100))
       : 0;
 
     // Back-compat top-level keys + richer structure
@@ -84,7 +90,7 @@ export async function GET(req: NextRequest) {
       period_id:    period.periodId,
       period_start: period.startIso,
       period_end:   period.endIso,
-      monthly_quota_ms,
+      monthly_quota_ms: total_quota_ms,
       used_ms,
       remaining_ms,
 
@@ -98,14 +104,21 @@ export async function GET(req: NextRequest) {
       period: { id: period.periodId, startIso: period.startIso, endIso: period.endIso },
       plan_info: {
         code: plan?.plan_code ?? plan?.plan ?? 'free',
-        monthly_quota_ms,
+        monthly_quota_ms: total_quota_ms,
         monthly_quota_minutes: quota_minutes,
         renew_day,
         timezone,
       },
       usage: {
-        used_ms, remaining_ms, quota_ms: monthly_quota_ms,
-        used_minutes, remaining_minutes, quota_minutes: quota_minutes,
+        used_ms,
+        remaining_ms,
+        quota_ms: total_quota_ms,
+        used_minutes,
+        remaining_minutes,
+        quota_minutes: quota_minutes,
+        bonus_minutes,
+        base_quota_minutes,
+        period_ends_at: usageSnapshot.periodEndsAt,
         used_pct,
       },
       details, // per-transcript debits this period

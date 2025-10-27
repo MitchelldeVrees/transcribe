@@ -5,6 +5,7 @@ import { requireAuth, TokenExpiredError, UnauthorizedError } from '@/lib/require
 import { currentPeriod } from '@/lib/period';
 import { parseAudioLengthToMs } from '@/lib/duration';
 import { randomUUID } from 'crypto';
+import { getEffectiveQuotaMs } from '@/lib/billing';
 
 export async function POST(req: NextRequest) {
   try {
@@ -43,6 +44,12 @@ export async function POST(req: NextRequest) {
       const renew_day = plan?.renew_day ?? 1;
       const timezone = plan?.timezone || 'UTC';
       const period = currentPeriod(timezone, renew_day);
+      const { quotaMs: effectiveQuotaMs } = await getEffectiveQuotaMs(
+        db,
+        me.sub,
+        monthly_quota_ms,
+        period.periodId
+      );
 
       // Ensure row exists for this period
       await db.execute(
@@ -66,7 +73,7 @@ export async function POST(req: NextRequest) {
         `UPDATE usage_monthly
             SET used_ms = used_ms + ?, updated_at = STRFTIME('%Y-%m-%dT%H:%M:%fZ','now')
           WHERE subId = ? AND period_id = ? AND (used_ms + ?) <= ?`,
-        [audioLength, me.sub, period.periodId, audioLength, monthly_quota_ms]
+        [audioLength, me.sub, period.periodId, audioLength, effectiveQuotaMs]
       );
 
       if (result.rowsAffected === 0) {
@@ -90,7 +97,7 @@ export async function POST(req: NextRequest) {
         [me.sub, period.periodId]
       );
       const used_ms = (usedRes.rows[0] as any)?.used_ms ?? 0;
-      const remaining_ms = Math.max(monthly_quota_ms - used_ms, 0);
+      const remaining_ms = Math.max(effectiveQuotaMs - used_ms, 0);
 
       return NextResponse.json({
         id, // transcript id
@@ -103,6 +110,7 @@ export async function POST(req: NextRequest) {
         debited_ms: audioLength,
         period: period.periodId,
         remaining_ms,
+        quota_ms: effectiveQuotaMs,
         period_start: period.startIso,
         period_end: period.endIso,
       });
