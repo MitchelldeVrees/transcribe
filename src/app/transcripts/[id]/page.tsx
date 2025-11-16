@@ -4,12 +4,13 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import useSWR from "swr";
-import Sidebar, { Transcript } from "@/components/Sidebar";
+import Sidebar from "@/components/Sidebar";
 import ResultsSection from "@/components/ResultsSection";
 import { stopwords } from "../../stopwords";
 import { useSession } from "next-auth/react";
 import DownloadModal from '../../../components/downloadModal';
 import { FaFileWord, FaFilePdf } from "react-icons/fa";
+import { useTranscriptsData } from "../../transcriptsProvider";
 
 const fetcher = (url: string, token: string) =>
   fetch(url, { headers: { Authorization: `Bearer ${token}` } }).then((r) => {
@@ -41,22 +42,13 @@ export default function TranscriptPage() {
 
   const [modalOpen, setModalOpen] = useState(false);
   const [modalType, setModalType] = useState<'word'|'pdf'>('word');
-  
 
-
-  // --- 1) SWR for sidebar list ---
   const {
-    data: listData,
-    isLoading: listLoading,
-    error: listError,
-    mutate: mutateList
-  } = useSWR(
-    isLoaded && isSignedIn && session?.accessToken ? ["/api/transcripts", session.accessToken] : null,
-    ([url, token]) => fetcher(url, token!),
-    {
-      revalidateOnFocus: false,
-    }
-  );
+    transcripts,
+    setTranscripts,
+    loading: transcriptsLoading,
+    error: transcriptsError,
+  } = useTranscriptsData();
 
   // --- 2) SWR for detail ---
   const {
@@ -119,12 +111,14 @@ export default function TranscriptPage() {
       }
       // trigger a refetch for the detail endpoint:
       await mutateDetail();        
-      // update your list titles optimistically if you like:
-      mutateList((prev: { transcripts: Transcript[] } | undefined) => ({
-        transcripts: prev!.transcripts.map(t =>
-          t.id === id ? { ...t, title: titleInput } : t
-        )
-      }), false);
+      setTranscripts((prev) =>
+        prev.map((t) => {
+          if (String(t.id) === String(id)) {
+            return { ...t, title: titleInput };
+          }
+          return t;
+        })
+      );
     } catch (e) {
       console.error("Failed to save title", e);
     } finally {
@@ -155,10 +149,10 @@ export default function TranscriptPage() {
     );
   }
 
-  if (listLoading || detailLoading) {
+  if ((transcriptsLoading && transcripts.length === 0) || detailLoading) {
     return (
       <div className="flex h-screen">
-        <Sidebar transcripts={listData?.transcripts || []} />
+        <Sidebar transcripts={transcripts} />
         <main className="flex-1 flex items-center justify-center">
           <p>Loading…</p>
         </main>
@@ -166,13 +160,13 @@ export default function TranscriptPage() {
     );
   }
 
-  if (listError || detailError) {
+  if (transcriptsError || detailError) {
     return (
       <div className="flex h-screen">
-        <Sidebar transcripts={listData?.transcripts || []} />
+        <Sidebar transcripts={transcripts} />
         <main className="flex-1 flex items-center justify-center">
           <p className="text-red-600">
-            {(listError || detailError)!.message}
+            {transcriptsError ?? detailError?.message}
           </p>
         </main>
       </div>
@@ -180,7 +174,6 @@ export default function TranscriptPage() {
   }
 
   const transcript = detailData!.transcript;
-  const transcripts = listData!.transcripts;
 
   return (
     <div className="flex h-screen">

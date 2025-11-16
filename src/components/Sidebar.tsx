@@ -14,6 +14,7 @@ import {
   FaCog,
   FaBars,
   FaTimes,
+  FaEllipsisV,
 } from "react-icons/fa";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -132,13 +133,10 @@ export default function Sidebar({ transcripts }: SidebarProps) {
         animate={{ width: isOpen ? SIDEBAR_WIDTH : 0 }}
         transition={{ type: "tween", duration: 0.3 }}
         className={`
-          /* mobile: overlay under the button */
           fixed inset-y-0 left-0 z-40
           bg-blue-600 text-white flex flex-col overflow-hidden
-
-          /* show in-flow on desktop so it pushes main */
-          md:relative md:inset-auto md:z-auto
         `}
+        style={{ position: 'fixed' }}
       >
         
         {/* Spacer under header */}
@@ -212,24 +210,38 @@ export default function Sidebar({ transcripts }: SidebarProps) {
         {/* Account info / Sign out */}
         {isSignedIn && isOpen && (
           <div className="p-4 border-t border-blue-700 bg-blue-900">
-            <div className="flex items-center space-x-2 mb-2">
-              <div className="font-medium">{user?.name}</div>
-              <div className="text-xs text-indigo-300">{planLabel}</div>
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <div>
+                <div className="font-medium">{user?.name}</div>
+                <div className="text-xs text-indigo-300">{planLabel}</div>
+              </div>
+              <button
+                onClick={() => router.push("/account")}
+                aria-label="Ga naar account"
+                className="rounded-full p-2 text-indigo-200 transition hover:bg-blue-800 hover:text-white"
+              >
+                <FaEllipsisV size={14} />
+              </button>
             </div>
             <button
-      onClick={async () => {
-        // don’t auto-redirect so we can refresh UI first
-        await signOut({ redirect: false });
-        router.replace("/");  // where you want them after logout
-        router.refresh();      // revalidate server components / session
-      }}
-      className="text-indigo-300 hover:text-white"
-    >
-      <FaSignOutAlt className="inline mr-1" /> Logout
-    </button>
+              onClick={async () => {
+                await signOut({ redirect: false });
+                router.replace("/");
+                router.refresh();
+              }}
+              className="text-indigo-300 hover:text-white"
+            >
+              <FaSignOutAlt className="inline mr-1" /> Logout
+            </button>
           </div>
         )}
       </motion.aside>
+      {/* Spacer so main content doesn't slide beneath the fixed sidebar on desktop */}
+      <div
+        className="hidden md:block"
+        style={{ width: SIDEBAR_WIDTH, flexShrink: 0 }}
+        aria-hidden="true"
+      />
       <style jsx global>{`
         .sidebar-scroll {
           scrollbar-width: thin;

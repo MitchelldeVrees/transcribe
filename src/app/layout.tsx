@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { SessionProvider } from './sessionProvider';
+import { TranscriptsProvider } from './transcriptsProvider';
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -23,7 +24,9 @@ export default function RootLayout({
     <html lang="en">
       <body className={inter.className}>
         {/* SessionProvider wraps the application */}
-        <SessionProvider>{children}</SessionProvider>
+        <SessionProvider>
+          <TranscriptsProvider>{children}</TranscriptsProvider>
+        </SessionProvider>
       </body>
     </html>
   );

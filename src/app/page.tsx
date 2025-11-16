@@ -4,10 +4,11 @@ import React, { useState, useRef, useEffect } from "react";
 import { saveAs } from "file-saver";
 import { Document, Packer, Paragraph, TextRun } from "docx";
 import { stopwords } from "./stopwords"; // adjust path as needed
-import Sidebar, { Transcript } from "../components/Sidebar";
+import Sidebar from "../components/Sidebar";
 import ResultsSection from "@/components/ResultsSection";
 import Link from "next/link";
 import { useSession, signIn } from "next-auth/react";
+import { useTranscriptsData } from "./transcriptsProvider";
 import { countMeaningfulWords as countDutch } from "../lib/wordCountDutch";
 import { useRouter } from "next/navigation";
 import Swal from 'sweetalert2';
@@ -76,7 +77,7 @@ function validateSelectedFile(file: File | null): string | null {
 export default function Home() {
   // States for file data and transcription
   const progressInterval = useRef<NodeJS.Timeout>();
-  const [transcripts, setTranscripts] = useState<Transcript[]>([])
+  const { transcripts, setTranscripts, refresh: refreshTranscripts } = useTranscriptsData();
   const [saving, setSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -117,39 +118,6 @@ export default function Home() {
   const [hasSaved, setHasSaved] = useState(false); // NEW
 
   // helper to (re)fetch transcripts
-  const fetchTranscripts = async () => {
-    if (!(isLoaded && isSignedIn && session?.accessToken)) return;
-    try {
-      const res = await fetch("/api/transcripts", {
-        headers: { Authorization: `Bearer ${session.accessToken}` },
-      });
-      if (!res.ok) throw new Error("AUTH_ERROR");
-      const data = await res.json();
-      setTranscripts(data.transcripts);
-    } catch (err) {
-      console.error(err);
-      setError("Er is iets misgegaan bij het ophalen van je transcripts.");
-    }
-  };
-
-  useEffect(() => {
-
-    if (isLoaded && isSignedIn && session?.accessToken) {
-      fetch("/api/transcripts", {
-        headers: { Authorization: `Bearer ${session.accessToken}` },
-      })
-        .then((res) => {
-          if (!res.ok) throw new Error("AUTH_ERROR");
-          return res.json();
-        })
-        .then((data) => setTranscripts(data.transcripts))
-        .catch((err) => {
-          console.error(err);
-          setError("Er is iets misgegaan bij het ophalen van je transcripts.");
-        });
-    }
-  }, [isLoaded, isSignedIn, session]);
-
   useEffect(() => {
     const stored = typeof window !== 'undefined' ? window.localStorage.getItem(STORAGE_KEY) : null;
     if (stored) {
@@ -199,7 +167,7 @@ export default function Home() {
       }
   
       // Refetch the list right after saving
-      await fetchTranscripts();
+      await refreshTranscripts();
   
       setHasSaved(true); // lock the button
   

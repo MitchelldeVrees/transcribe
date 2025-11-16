@@ -1,7 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import Sidebar, { Transcript } from "@/components/Sidebar";
+import React from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { motion } from "framer-motion";
@@ -67,27 +66,6 @@ export default function AboutPage() {
   const { data: session, status } = useSession();
   const isLoaded = status !== "loading";
   const isSignedIn = status === "authenticated";
-  const [transcripts, setTranscripts] = useState<Transcript[]>([]);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    if (isLoaded && isSignedIn && session?.accessToken) {
-      fetch("/api/transcripts", {
-        headers: { Authorization: `Bearer ${session.accessToken}` },
-      })
-        .then((res) => {
-          if (!res.ok) throw new Error("AUTH_ERROR");
-          return res.json();
-        })
-        .then((data) => setTranscripts(data.transcripts))
-        .catch((err) => {
-          console.error(err);
-          setError(
-            "Er is iets misgegaan bij het ophalen van je transcripts."
-          );
-        });
-    }
-  }, [isLoaded, isSignedIn, session]);
 
   if (!isLoaded) {
     return (
@@ -271,9 +249,6 @@ export default function AboutPage() {
                   </p>
                 </motion.div>
               </div>
-              {error && (
-                <p className="text-red-600 mt-4 text-center px-6">{error}</p>
-              )}
             </motion.div>
           </section>
         </div>

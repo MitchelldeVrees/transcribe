@@ -85,10 +85,10 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
   trustHost: true,  // required for Pages/Workers
   cookies: {
     // keep sharing across subdomains
-    sessionToken: { options: { domain: ".luisterslim.nl", path: "/", secure: true, httpOnly: true,  sameSite: "lax" } },
+    // sessionToken: { options: { domain: ".luisterslim.nl", path: "/", secure: true, httpOnly: true,  sameSite: "lax" } },
     // ⬇️ important: httpOnly: false for CSRF
     csrfToken:    { options: {                 path: "/", secure: true, httpOnly: true,  sameSite: "lax" } },
     state:        { options: {                 path: "/", secure: true, httpOnly: true,  sameSite: "lax" } },
-    callbackUrl:  { options: { domain: ".luisterslim.nl", path: "/", secure: true, httpOnly: false, sameSite: "lax" } },
+    // callbackUrl:  { options: { domain: ".luisterslim.nl", path: "/", secure: true, httpOnly: false, sameSite: "lax" } },
   }
 } as NextAuthConfig); // type mismatch in NextAuth types
