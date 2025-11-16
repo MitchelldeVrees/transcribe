@@ -1,7 +1,7 @@
 // components/Sidebar.tsx
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -29,14 +29,51 @@ interface SidebarProps {
 
 const SIDEBAR_WIDTH = 256;
 
+function formatPlanName(code: string) {
+  if (!code) return 'Free plan';
+  return code
+    .replace(/[_-]+/g, ' ')
+    .split(' ')
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
 export default function Sidebar({ transcripts }: SidebarProps) {
   const [isOpen, setIsOpen] = useState(true);
   const { data: session, status } = useSession();
   const isSignedIn = status === "authenticated";
   const user = session?.user;
+  const [planLabel, setPlanLabel] = useState<string>('Free plan');
   const toggleSidebar = () => setIsOpen((open) => !open);
 
   const router = useRouter();
+
+  useEffect(() => {
+    if (!isSignedIn || !session?.accessToken) {
+      setPlanLabel('Free plan');
+      return;
+    }
+    let cancelled = false;
+
+    fetch('/api/mobileBackend/usage', {
+      headers: { Authorization: `Bearer ${session.accessToken}` },
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!cancelled && data) {
+          const code = data.plan_info?.code || data.plan || 'free';
+          setPlanLabel(formatPlanName(String(code)));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setPlanLabel('Free plan');
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isSignedIn, session?.accessToken]);
 
   
   return (
@@ -82,7 +119,11 @@ export default function Sidebar({ transcripts }: SidebarProps) {
           </AnimatePresence>
         </button>
 
-        {isOpen && <span className="text-white text-xl font-bold">Luisterslim</span>}
+        {isOpen && (
+          <Link href="/" className="text-white text-xl font-bold">
+            Luisterslim
+          </Link>
+        )}
       </div>
 
       {/* Sidebar container */}
@@ -128,7 +169,7 @@ export default function Sidebar({ transcripts }: SidebarProps) {
             </div>
 
             {/* Transcript list */}
-            <div className="flex-1 overflow-y-auto">
+            <div className="flex-1 overflow-y-auto sidebar-scroll">
               {isSignedIn ? (
                 transcripts.length > 0 ? (
                   transcripts.map((t) => {
@@ -173,7 +214,7 @@ export default function Sidebar({ transcripts }: SidebarProps) {
           <div className="p-4 border-t border-blue-700 bg-blue-900">
             <div className="flex items-center space-x-2 mb-2">
               <div className="font-medium">{user?.name}</div>
-              <div className="text-xs text-indigo-300">Free Plan</div>
+              <div className="text-xs text-indigo-300">{planLabel}</div>
             </div>
             <button
       onClick={async () => {
@@ -189,6 +230,25 @@ export default function Sidebar({ transcripts }: SidebarProps) {
           </div>
         )}
       </motion.aside>
+      <style jsx global>{`
+        .sidebar-scroll {
+          scrollbar-width: thin;
+          scrollbar-color: rgba(255, 255, 255, 0.5) transparent;
+        }
+        .sidebar-scroll::-webkit-scrollbar {
+          width: 6px;
+        }
+        .sidebar-scroll::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .sidebar-scroll::-webkit-scrollbar-thumb {
+          background-color: rgba(255, 255, 255, 0.5);
+          border-radius: 9999px;
+        }
+        .sidebar-scroll::-webkit-scrollbar-thumb:hover {
+          background-color: rgba(255, 255, 255, 0.7);
+        }
+      `}</style>
     </>
   );
 }

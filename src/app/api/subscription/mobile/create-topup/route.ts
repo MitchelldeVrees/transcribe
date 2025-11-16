@@ -34,6 +34,12 @@ export async function POST(req: NextRequest) {
     const stripe = getStripeClient();
     const customerId = await getOrCreateStripeCustomerId(db, stripe, me.sub);
 
+    const baseIdempotencyKey =
+      req.headers.get('Idempotency-Key') ??
+      `mobile-topup-${me.sub}-${Date.now().toString(36)}-${Math.random()
+        .toString(36)
+        .slice(2, 10)}`;
+
     await stripe.invoiceItems.create(
       {
         customer: customerId,
@@ -42,20 +48,24 @@ export async function POST(req: NextRequest) {
           accountId: me.sub,
           topUpId: topUp.id,
         },
-      } as unknown as Stripe.InvoiceItemCreateParams
+      } as unknown as Stripe.InvoiceItemCreateParams,
+      { idempotencyKey: `${baseIdempotencyKey}:invoiceitem` }
     );
 
-    const draftInvoice = await stripe.invoices.create({
-      customer: customerId,
-      collection_method: 'charge_automatically',
-      pending_invoice_items_behavior: 'include',
-      auto_advance: false,
-      metadata: {
-        accountId: me.sub,
-        topUpId: topUp.id,
+    const draftInvoice = await stripe.invoices.create(
+      {
+        customer: customerId,
+        collection_method: 'charge_automatically',
+        pending_invoice_items_behavior: 'include',
+        auto_advance: false,
+        metadata: {
+          accountId: me.sub,
+          topUpId: topUp.id,
+        },
+        description: topUp.label,
       },
-      description: topUp.label,
-    });
+      { idempotencyKey: `${baseIdempotencyKey}:invoice` }
+    );
 
     if (!draftInvoice.id) {
       throw new Error('Stripe invoice misconfigured (missing id)');
@@ -69,10 +79,30 @@ export async function POST(req: NextRequest) {
       payment_intent?: Stripe.PaymentIntent | string | null;
     };
 
-    const paymentIntent =
+    let paymentIntent =
       invoice.payment_intent && typeof invoice.payment_intent === 'object'
         ? (invoice.payment_intent as Stripe.PaymentIntent)
         : null;
+    const paymentIntentId =
+      invoice.payment_intent && typeof invoice.payment_intent === 'string'
+        ? invoice.payment_intent
+        : paymentIntent?.id ?? null;
+
+    if ((!paymentIntent || !paymentIntent.client_secret) && paymentIntentId) {
+      try {
+        const fetched = await stripe.paymentIntents.retrieve(paymentIntentId);
+        paymentIntent = fetched;
+      } catch (piErr: any) {
+        console.error('Stripe top-up payment intent fallback failed', {
+          paymentIntentId,
+          message: piErr?.message,
+          type: piErr?.type,
+          status: piErr?.statusCode,
+          requestId: piErr?.raw?.requestId,
+        });
+      }
+    }
+
     if (!paymentIntent?.client_secret) {
       console.error('Stripe top-up invoice missing payment intent', invoice.id);
       return NextResponse.json(

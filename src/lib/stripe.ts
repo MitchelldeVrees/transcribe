@@ -1,18 +1,24 @@
 // src/lib/stripe.ts
 import Stripe from 'stripe';
 
-const STRIPE_API_VERSION: Stripe.LatestApiVersion = '2025-08-27.basil';
+// Keep this aligned with the account's default Stripe API version.
+export const STRIPE_API_VERSION = '2025-10-29.clover' as const;
 
 let stripeClient: Stripe | null = null;
 
 export function getStripeClient(): Stripe {
-  
-  if (!stripeClient) {
-    stripeClient = new Stripe('sk_test_51IOhNJCNUsKHlBxZiNASQEmkYEA3CGEypVMmvCvroXrlg52kSviRRm6OcofT5cxBf7J7fZHDdj0AMXSLXQqzndOp00ghiy4vYo', {
-      apiVersion: STRIPE_API_VERSION,
-    });
+  if (stripeClient) return stripeClient;
+
+  const key = process.env.STRIPE_SECRET_KEY;
+  if (!key) {
+    throw new Error('Missing STRIPE_SECRET_KEY');
   }
+
+  stripeClient = new Stripe(key, {
+    apiVersion: STRIPE_API_VERSION,
+    httpClient: Stripe.createFetchHttpClient(),
+    maxNetworkRetries: 2,
+  });
+
   return stripeClient;
 }
-
-export { STRIPE_API_VERSION };

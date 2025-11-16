@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import useSWR from "swr";
 import Sidebar, { Transcript } from "@/components/Sidebar";
 import ResultsSection from "@/components/ResultsSection";
@@ -31,6 +31,7 @@ interface TranscriptDetail {
 
 export default function TranscriptPage() {
   const { id } = useParams();
+  const router = useRouter();
   // Grab session info from NextAuth
   const { data: session, status } = useSession();
   const isLoaded = status !== "loading";
@@ -186,60 +187,71 @@ export default function TranscriptPage() {
       <Sidebar transcripts={transcripts} />
 
       <main className="flex-1 overflow-y-auto px-6 pb-6 pt-16 bg-gray-50">
-        {/* Inline‐editable title */}
-        {isEditing ? (
-          <div className="relative mb-1">
-            <input
-              type="text"
-              maxLength={MAX_TITLE_LENGTH}
-              className="w-full text-2xl font-bold border-b-2 border-blue-500 focus:outline-none pr-16"
-              value={titleInput}
-              onChange={(e) => setTitleInput(e.target.value)}
-              onBlur={saveTitle}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") saveTitle();
-                if (e.key === "Escape") {
-                  setTitleInput(transcript.title);
-                  setIsEditing(false);
-                }
-              }}
-              autoFocus
-            />
-            <span className="absolute top-0 right-0 text-sm text-gray-500 mt-1 mr-2">
-              {titleInput.length}/{MAX_TITLE_LENGTH}
-            </span>
+        <div className="mb-6 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm md:flex md:items-center md:justify-between md:gap-8">
+          <div className="flex-1">
+            {/* Inline‐editable title */}
+            {isEditing ? (
+              <div className="relative mb-1">
+                <input
+                  type="text"
+                  maxLength={MAX_TITLE_LENGTH}
+                  className="w-full text-2xl font-bold border-b-2 border-blue-500 focus:outline-none pr-16"
+                  value={titleInput}
+                  onChange={(e) => setTitleInput(e.target.value)}
+                  onBlur={saveTitle}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") saveTitle();
+                    if (e.key === "Escape") {
+                      setTitleInput(transcript.title);
+                      setIsEditing(false);
+                    }
+                  }}
+                  autoFocus
+                />
+                <span className="absolute top-0 right-0 mt-1 mr-2 text-sm text-gray-500">
+                  {titleInput.length}/{MAX_TITLE_LENGTH}
+                </span>
+              </div>
+            ) : (
+              <h1
+                className="mb-1 cursor-text text-2xl font-bold"
+                onDoubleClick={() => setIsEditing(true)}
+              >
+                {transcript.title}
+              </h1>
+            )}
+            <p className="text-xs text-gray-500">
+              {new Date(transcript.created).toLocaleString("nl-NL", {
+                dateStyle: "medium",
+                timeStyle: "short",
+              })}
+            </p>
           </div>
-        ) : (
-          <h1
-            className="text-2xl font-bold mb-1 cursor-text"
-            onDoubleClick={() => setIsEditing(true)}
-          >
-            {transcript.title}
-          </h1>
-        )}
 
-        <p className="text-xs text-gray-500 mb-4">
-          {new Date(transcript.created).toLocaleString("nl-NL", {
-            dateStyle: "medium",
-            timeStyle: "short",
-          })}
-        </p>
-        Exporteer naar:
-
-<div className="mb-4 flex space-x-2">
-        <button
-          onClick={() => { setModalType("word"); setModalOpen(true); }}
-          className="rounded-lg bg-blue-600 p-2 text-white hover:bg-blue-500"
-        >
-          <FaFileWord size={20} />
-        </button>
-        <button
-          onClick={() => { setModalType("pdf"); setModalOpen(true); }}
-          className="rounded-lg bg-blue-600 p-2 text-white hover:bg-blue-500"
-        >
-          <FaFilePdf size={20} />
-        </button>
-      </div>
+          <div className="mt-4 flex flex-col gap-2 md:mt-0 md:items-end">
+            <p className="text-sm font-semibold text-gray-600">Exporteer naar</p>
+            <div className="flex space-x-2">
+              <button
+                onClick={() => {
+                  setModalType("word");
+                  setModalOpen(true);
+                }}
+                className="rounded-lg bg-blue-600 p-2 text-white hover:bg-blue-500"
+              >
+                <FaFileWord size={20} />
+              </button>
+              <button
+                onClick={() => {
+                  setModalType("pdf");
+                  setModalOpen(true);
+                }}
+                className="rounded-lg bg-blue-600 p-2 text-white hover:bg-blue-500"
+              >
+                <FaFilePdf size={20} />
+              </button>
+            </div>
+          </div>
+        </div>
 
 
 <DownloadModal
@@ -265,8 +277,8 @@ export default function TranscriptPage() {
           qna={transcript.qna || []}
           handleSave={() => {}}
           exportToWord={() => {}}
-          handleNewTranscription={() => {}}
-          />
+          handleNewTranscription={() => router.push("/")}
+        />
 
       </main>
     </div>

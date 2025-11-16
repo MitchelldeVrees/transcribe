@@ -4,6 +4,7 @@ import { jwtVerify, createRemoteJWKSet, type JWTPayload } from 'jose';
 import { getTursoClient } from '@/lib/turso';
 import { generateReferralCode } from '@/lib/referral';
 import { signAccess, signRefresh } from '@/lib/jwt';
+import { ensureDefaultPlan } from '@/lib/plans';
 
 // ---- Config (env) ----
 // If you verify multiple audiences (iOS, Android, Web) put all here:
@@ -157,23 +158,7 @@ export async function POST(req: NextRequest) {
         [sub, email, name, picture, createdISO, referralCode] as DBValue[]
       );
 
-      // Attach default plan from catalog ('free'); fall back to 10h if plans table is empty
-      const attachRes = await db.execute(
-        `INSERT INTO user_plans (subId, plan_code, monthly_quota_ms, renew_day, timezone, started_at)
-         SELECT ?, p.code, p.monthly_quota_ms, 1, ?, ?
-           FROM plans p
-          WHERE p.code = 'free'`,
-        [sub, 'UTC', createdISO] as DBValue[]
-      );
-
-      if ((attachRes as any).rowsAffected === 0) {
-        // Fallback: no 'plans' row found — hardcode 10h
-        await db.execute(
-          `INSERT INTO user_plans (subId, plan_code, monthly_quota_ms, renew_day, timezone, started_at)
-           VALUES (?, 'free', ?, 1, ?, ?)`,
-          [sub, 10 * 60 * 60 * 1000, 'UTC', createdISO] as DBValue[]
-        );
-      }
+      await ensureDefaultPlan(db, sub, createdISO);
     } else {
       // ---- Existing user: keep data fresh
       const row = (existing as any).rows[0] as any;
@@ -187,26 +172,7 @@ export async function POST(req: NextRequest) {
       );
 
       // Safety net: ensure they have a user_plans row (legacy accounts, etc.)
-      const planCheck = await db.execute(
-        `SELECT 1 FROM user_plans WHERE subId = ? LIMIT 1`,
-        [sub] as DBValue[]
-      );
-      if ((planCheck as any).rows?.length === 0) {
-        const attachRes = await db.execute(
-          `INSERT INTO user_plans (subId, plan_code, monthly_quota_ms, renew_day, timezone, started_at)
-           SELECT ?, p.code, p.monthly_quota_ms, 1, ?, ?
-             FROM plans p
-            WHERE p.code = 'free'`,
-          [sub, 'UTC', createdISO] as DBValue[]
-        );
-        if ((attachRes as any).rowsAffected === 0) {
-          await db.execute(
-            `INSERT INTO user_plans (subId, plan_code, monthly_quota_ms, renew_day, timezone, started_at)
-             VALUES (?, 'free', ?, 1, ?, ?)`,
-            [sub, 10 * 60 * 60 * 1000, 'UTC', createdISO] as DBValue[]
-          );
-        }
-      }
+      await ensureDefaultPlan(db, sub, createdISO);
     }
 
     // 3) Reload canonical user shape for client

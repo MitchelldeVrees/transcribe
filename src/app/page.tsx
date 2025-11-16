@@ -6,23 +6,71 @@ import { Document, Packer, Paragraph, TextRun } from "docx";
 import { stopwords } from "./stopwords"; // adjust path as needed
 import Sidebar, { Transcript } from "../components/Sidebar";
 import ResultsSection from "@/components/ResultsSection";
-import Swal from 'sweetalert2';
 import Link from "next/link";
 import { useSession, signIn } from "next-auth/react";
 import { countMeaningfulWords as countDutch } from "../lib/wordCountDutch";
+import { useRouter } from "next/navigation";
+import Swal from 'sweetalert2';
 
 interface QnaItem {
   question: string;
   answer:   string;
 }
 
-interface TranscribeResponse {
-  text:        string;
-  summary?:    string;
-  actionItems?:string;
-  qna?:        QnaItem[];   // ← now qna really is an array of {question,answer}
-}
+const MAX_FILE_BYTES = Number.POSITIVE_INFINITY; // disable cap for large-file testing
+const FILE_SIZE_LIMIT_ENABLED = Number.isFinite(MAX_FILE_BYTES);
+const MAX_UPLOAD_MB = FILE_SIZE_LIMIT_ENABLED
+  ? Math.floor(MAX_FILE_BYTES / (1024 * 1024))
+  : null;
+const ALLOWED_MIME_TYPES = new Set([
+  "audio/mpeg",
+  "audio/mp3",
+  "audio/mp4",
+  "audio/wav",
+  "audio/x-wav",
+  "audio/wave",
+  "audio/vnd.wave",
+  "audio/m4a",
+  "audio/webm",
+  "audio/aac",
+  "audio/ogg",
+  "audio/mpga",
+  "video/mp4",
+  "video/webm",
+]);
+const ALLOWED_EXTENSIONS = new Set([
+  ".mp3",
+  ".mpeg",
+  ".mpga",
+  ".m4a",
+  ".wav",
+  ".wave",
+  ".aac",
+  ".mp4",
+  ".webm",
+]);
+const ACCEPTED_FILE_LABEL = Array.from(ALLOWED_EXTENSIONS).join(", ");
+
 const STORAGE_KEY = "pendingTranscriptData";
+function isAllowedClientFile(file: File) {
+  const mime = (file.type || "").toLowerCase();
+  if (ALLOWED_MIME_TYPES.has(mime)) return true;
+  const dot = file.name.lastIndexOf(".");
+  if (dot === -1) return false;
+  const ext = file.name.slice(dot).toLowerCase();
+  return ALLOWED_EXTENSIONS.has(ext);
+}
+
+function validateSelectedFile(file: File | null): string | null {
+  if (!file) return "Selecteer eerst een bestand.";
+  if (!isAllowedClientFile(file)) {
+    return `Dit bestandstype wordt niet ondersteund. Gebruik een van: ${ACCEPTED_FILE_LABEL}.`;
+  }
+  if (FILE_SIZE_LIMIT_ENABLED && file.size > MAX_FILE_BYTES) {
+    return `Bestand is te groot. Maximaal ${MAX_UPLOAD_MB} MB toegestaan.`;
+  }
+  return null;
+}
 
 
 export default function Home() {
@@ -55,6 +103,7 @@ export default function Home() {
   const { data: session, status } = useSession();
   const isLoaded = status !== "loading";
   const isSignedIn = status === "authenticated";
+  const router = useRouter();
   const [pendingSave, setPendingSave] = useState(false);
 
   // New state: transcription model choice ("assembly" or "openai")
@@ -236,6 +285,20 @@ export default function Home() {
   // Process selected file
   const handleFiles = (files: FileList) => {
     const selectedFile = files[0];
+    if (!selectedFile) return;
+    const validationMessage = validateSelectedFile(selectedFile);
+    if (validationMessage) {
+      setError(validationMessage);
+      setFile(null);
+      setFileName("");
+      setAudioUrl("");
+      setFileSizeMB("");
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+      return;
+    }
+    setError("");
     setFile(selectedFile);
     setFileName(selectedFile.name);
     const sizeMB = (selectedFile.size / (1024 * 1024)).toFixed(2);
@@ -342,99 +405,280 @@ export default function Home() {
     return true; // treated as “handled” (don’t continue)
   }
 
+  const sleep = (ms: number) =>
+    new Promise((resolve) => {
+      setTimeout(resolve, ms);
+    });
+
+  const getAuthHeaders = () =>
+    session?.accessToken
+      ? { Authorization: `Bearer ${session.accessToken}` }
+      : undefined;
+
+  async function pollForTranscript(jobId: string): Promise<string> {
+    const timeoutMs = 4 * 60 * 1000;
+    const pollMs = 3000;
+    const started = Date.now();
+
+    while (Date.now() - started < timeoutMs) {
+      const res = await fetch(
+        `/api/mobileBackend/transcribe/status?jobId=${encodeURIComponent(jobId)}`,
+        {
+          method: "GET",
+          headers: getAuthHeaders(),
+          cache: "no-store",
+        }
+      );
+
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        throw new Error(
+          text || "Kan de status van de transcriptie niet ophalen."
+        );
+      }
+
+      const payload = await res.json();
+      const status = String(payload.status || "");
+      const jobText = typeof payload.text === "string" ? payload.text : "";
+
+      if (status === "done" && jobText) {
+        return jobText;
+      }
+
+      if (status === "error") {
+        throw new Error(
+          payload.error ||
+            "Het transcriberen is mislukt. Probeer het later opnieuw."
+        );
+      }
+
+      await sleep(pollMs);
+    }
+
+    throw new Error(
+      "Het ophalen van de transcriptie duurde te lang. Probeer het later opnieuw."
+    );
+  }
+
+  async function requestSummaries(jobId: string, extraInfo: string) {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      ...(getAuthHeaders() || {}),
+    };
+
+    const res = await fetch("/api/mobileBackend/summarize", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ jobId, extraInfo }),
+    });
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      throw new Error(
+        text || "Samenvatten is mislukt. Probeer het later opnieuw."
+      );
+    }
+
+    return res.json();
+  }
+
+  const generateJobId = () => {
+    if (typeof crypto !== "undefined") {
+      if (crypto.randomUUID) return crypto.randomUUID();
+      if (crypto.getRandomValues) {
+        const bytes = new Uint8Array(16);
+        crypto.getRandomValues(bytes);
+        bytes[6] = (bytes[6] & 0x0f) | 0x40;
+        bytes[8] = (bytes[8] & 0x3f) | 0x80;
+        const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, "0"));
+        return `${hex.slice(0, 4).join("")}-${hex.slice(4, 6).join("")}-${hex
+          .slice(6, 8)
+          .join("")}-${hex.slice(8, 10).join("")}-${hex
+          .slice(10, 16)
+          .join("")}`;
+      }
+    }
+    return `${Date.now().toString(36)}-${Math.random()
+      .toString(36)
+      .slice(2, 10)}`;
+  };
+
+  async function requestUploadSlot(file: File) {
+    const mimeType = file.type || "application/octet-stream";
+    const res = await fetch("/api/mobileBackend/uploads/presign", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(getAuthHeaders() || {}),
+      },
+      body: JSON.stringify({
+        filename: file.name,
+        mimeType,
+      }),
+    });
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      throw new Error(
+        text || "Kon geen upload-URL ophalen. Probeer het later opnieuw."
+      );
+    }
+
+    const data = await res.json();
+    if (!data.uploadUrl || !data.blobName) {
+      throw new Error("Server gaf geen geldige upload-URL terug.");
+    }
+
+    return {
+      uploadUrl: String(data.uploadUrl),
+      blobName: String(data.blobName),
+      mimeType,
+    };
+  }
+
+  async function uploadFileToAzure(
+    uploadUrl: string,
+    file: File,
+    mimeType: string
+  ) {
+    const res = await fetch(uploadUrl, {
+      method: "PUT",
+      headers: {
+        "x-ms-blob-type": "BlockBlob",
+        "Content-Type": mimeType,
+      },
+      body: file,
+    });
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      throw new Error(text || "Uploaden naar Azure is mislukt.");
+    }
+  }
+
+  async function startTranscriptionJob(
+    jobId: string,
+    blobName: string,
+    file: File,
+    extraInfo: string
+  ) {
+    const mimeType = file.type || "application/octet-stream";
+    const res = await fetch(
+      `/api/mobileBackend/transcribe/start?jobId=${encodeURIComponent(jobId)}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(getAuthHeaders() || {}),
+        },
+        body: JSON.stringify({
+          blobName,
+          size: file.size,
+          mimeType,
+          extraInfo,
+        }),
+      }
+    );
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      throw new Error(text || "Kon de transcriptie-taak niet starten.");
+    }
+  }
+
   
   // Transcribe button action
   async function handleTranscribe() {
     if (!file) return;
+    const validationMessage = validateSelectedFile(file);
+    if (validationMessage) {
+      setError(validationMessage);
+      setStage("upload");
+      return;
+    }
+    if (!isSignedIn) {
+      await promptLoginIfNeeded();
+      return;
+    }
+
     setStage("loading");
     setError("");
     setProgress(0);
-  
+    setSummarization(true);
+
     const startTime = performance.now();
-    console.log('Uploading chunk:', {
-      name: file.name,
-      type: file.type,
-      size: file.size
-    });
-    
     try {
-      // 1) Split audio en chunk-files
-  
-      // 2) FormData & API-call
-      const form = new FormData();
-      form.append("audioFile", file, file.name);
+      setProgress(5);
+      const { uploadUrl, blobName, mimeType } = await requestUploadSlot(file);
+      setProgress(15);
 
-      setSummarization(true);
-      form.append("enableSummarization", summarization ? "true" : "false");
-  
-      const response = await fetch("/api/transcribe", {
-        method: "POST",
-        body: form,
-        headers: session?.accessToken
-          ? { Authorization: `Bearer ${session.accessToken}` }
-          : undefined,
-      });
-        const contentType = response.headers.get("content-type") || "";
-        const text   = await response.text();          // always grab raw
-        if (!response.ok) {
-          console.error("API error:", text);
-          const msg = response.status >= 500
-            ? "Er is een fout opgetreden aan onze kant. Probeer het later opnieuw."
-            : "Er ging iets mis met je upload. Controleer je bestand en probeer opnieuw.";
-          throw new Error(msg);
+      await uploadFileToAzure(uploadUrl, file, mimeType);
+      setProgress(40);
 
+      const jobId = generateJobId();
+      const extraInfoForJob = "";
+      await startTranscriptionJob(jobId, blobName, file, extraInfoForJob);
+      setProgress(55);
+
+      const transcriptText = await pollForTranscript(jobId);
+      setProgress(75);
+      setTranscript(transcriptText);
+
+      let summaryHtml = "";
+      let actionItemsHtml = "";
+      let qnaItems: QnaItem[] = [];
+      let summaryError = "";
+
+      if (summarization && transcriptText.length > 20) {
+        try {
+          const summaryData = await requestSummaries(jobId, extraInfoForJob);
+          summaryHtml = summaryData.summary ?? "";
+          actionItemsHtml = summaryData.actionItems ?? "";
+
+          qnaItems = Array.isArray(summaryData.qna)
+            ? summaryData.qna
+            : typeof summaryData.qna === "string"
+              ? (() => {
+                  try {
+                    return JSON.parse(summaryData.qna);
+                  } catch {
+                    return [];
+                  }
+                })()
+              : [];
+        } catch (summaryErr: any) {
+          console.error(summaryErr);
+          summaryError =
+            "De transcriptie is gelukt, maar samenvatten is mislukt. Probeer het later opnieuw.";
         }
-        if (!contentType.includes("application/json")) {
-          console.error("Expected JSON but got:", text);
-          throw new Error("Er is iets misgegaan bij het verwerken. Probeer het later opnieuw.");
-        }
-        const data = JSON.parse(text);  // now safe to parse
+      }
 
-  
+      setSummary(summaryHtml);
+      setActionItems(actionItemsHtml);
+      setQna(qnaItems);
 
-      // 4) Zet transcript en samenvatting
-      setTranscript(data.text);
-      setSummary(data.summary ?? "");
-      setActionItems(data.actionItems ?? "");
-      const parsedQna = Array.isArray(data.qna)
-      ? data.qna
-      : typeof data.qna === "string"
-        ? JSON.parse(data.qna)
-        : [];
-      setQna(parsedQna);
-      console.log("QNA");
-      console.log(qna);
-      // 5) Meet en zet verwerkingstijd
-      setProcessingTime(
-        Math.round((performance.now() - startTime) / 1000)
-      );
+      if (summaryError) {
+        setError(summaryError);
+      } else {
+        setError("");
+      }
 
-      setWordCount(countDutch(data.text));
-  
-      // 6) Bereken woordfrequenties
-      // 6a) Vind alle woorden (geen cijfers/punctie) of lege array
-      const matches = data.text
-        .toLowerCase()
-        .match(/\b[^\d\W]+\b/g) || [];
-  
-      // 6b) Filter stopwoorden
+      setProcessingTime(Math.round((performance.now() - startTime) / 1000));
+      setWordCount(countDutch(transcriptText));
+
+      const matches = transcriptText.toLowerCase().match(/\b[^\d\W]+\b/g) || [];
       const filtered = matches.filter((w: string) => !stopwords.includes(w));
-  
-      // 6c) Tel per woord
       const freqMap: Record<string, number> = {};
       filtered.forEach((word: string | number) => {
         freqMap[word] = (freqMap[word] || 0) + 1;
       });
-  
-      // 6d) Maak er een array van en sorteer op aflopend
       const freqArray = Object.entries(freqMap)
         .map(([word, count]) => ({ word, count }))
         .sort((a, b) => b.count - a.count)
-        .slice(0, 20); // top 20
-  
+        .slice(0, 20);
       setWordFrequencies(freqArray);
-  
-      // 7) Toon de resultaten
+
+      setProgress(100);
       setStage("results");
     } catch (err: any) {
       console.error(err);
@@ -458,8 +702,16 @@ export default function Home() {
     setWordCount(0);
     setProcessingTime(0);
     setStage("upload");
-
-
+    setSummary("");
+    setActionItems("");
+    setQna([]);
+    setWordFrequencies([]);
+    setSpeakersTranscript("");
+    setHasSaved(false);
+    setSaving(false);
+    setPendingSave(false);
+    setEstimatedSec(0);
+    router.push("/");
   }
 
 
@@ -586,7 +838,7 @@ export default function Home() {
 <input
   ref={fileInputRef}
   type="file"
-  accept="audio/mpeg,audio/mp4,audio/wav,video/mp4,video/webm"
+  accept=".mp3,.m4a,.wav,.mp4,.webm,.aac,.mpeg,.mpga,audio/*"
   className="hidden"
   onChange={async (e) => {
     // Block selection if not signed in

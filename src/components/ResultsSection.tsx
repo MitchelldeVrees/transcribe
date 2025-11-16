@@ -44,10 +44,12 @@ function HtmlPanel({
   title,
   html,
   onCopy,
+  contentClassName = "text-gray-800",
 }: {
   title: string;
   html: string;
   onCopy: () => void;
+  contentClassName?: string;
 }) {
   return (
     <div className="rounded-lg border border-gray-200 bg-white">
@@ -62,7 +64,7 @@ function HtmlPanel({
       </div>
 
       <div
-        className="p-4 text-gray-800"
+        className={`px-4 py-4 ${contentClassName}`}
         dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(html) }}
       />
     </div>
@@ -287,18 +289,24 @@ export default function ResultsSection({
 
 {actionItems && (
   looksLikeHtml(actionItems) ? (
-    <div className="space-y-2">
-      <h3 className="text-lg font-semibold text-gray-800">Actiepunten & Taken</h3>
-      <div
-        className="text-gray-800"
-        // no card, no border — just the HTML
-        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(actionItems) }}
-      />
-    </div>
+    <HtmlPanel
+      title="Actiepunten & Taken"
+      html={actionItems}
+      onCopy={() => navigator.clipboard.writeText(actionItems)}
+      contentClassName="text-black pl-6"
+    />
   ) : (
-    <div className="space-y-2">
-      <h3 className="text-lg font-semibold text-gray-800">Actiepunten & Taken</h3>
-      <pre className="whitespace-pre-wrap text-gray-800">{actionItems}</pre>
+    <div className="rounded-lg border border-gray-200 bg-white">
+      <div className="mb-0 flex items-center justify-between border-b border-gray-200 px-4 py-3">
+        <h3 className="text-lg font-semibold text-gray-800">Actiepunten & Taken</h3>
+        <button
+          onClick={() => navigator.clipboard.writeText(actionItems)}
+          className="inline-flex items-center rounded-md bg-blue-50 px-2 py-1 text-sm font-medium text-blue-700 transition hover:bg-blue-100"
+        >
+          <FaCopy className="mr-1" /> Kopieer
+        </button>
+      </div>
+      <pre className="whitespace-pre-wrap px-4 py-3 text-black pl-6">{actionItems}</pre>
     </div>
   )
 )}

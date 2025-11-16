@@ -1,6 +1,7 @@
 // src/app/api/mobileBackend/summarize/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/requireAuth';
+import { getTursoClient } from '@/lib/turso';
 import OpenAI from 'openai';
 
 export const runtime = 'nodejs';
@@ -105,15 +106,34 @@ Gebruik Tailwind CSS classes. voor de styling van de samenvatting en actionpoint
 
 export async function POST(req: NextRequest) {
   try {
-    await requireAuth(req.headers);
+    const me = await requireAuth(req.headers);
 
     if (!GROK_API_KEY || !GROK_BASE_URL) {
       return jsonError('LLM configuration missing', 500);
     }
 
     const body = await req.json().catch(() => ({}));
-    const text = String(body.text || '');
-    const extraInfo = String(body.extraInfo || '');
+    let text = typeof body.text === 'string' ? body.text : '';
+    let extraInfo = typeof body.extraInfo === 'string' ? body.extraInfo : '';
+    const jobId = typeof body.jobId === 'string' ? body.jobId : '';
+
+    if ((!text || text.length < 20) && jobId) {
+      const db = getTursoClient();
+      const res = await db.execute(
+        `SELECT result_text, extraInfo
+           FROM transcribe_jobs
+          WHERE id = ? AND subId = ?`,
+        [jobId, me.sub]
+      );
+      const row = res.rows[0] as any;
+      if (!row?.result_text) {
+        return jsonError('Transcript not found', 404);
+      }
+      text = String(row.result_text || '');
+      if (!extraInfo) {
+        extraInfo = typeof row.extraInfo === 'string' ? row.extraInfo : '';
+      }
+    }
 
     if (!text || text.length < 20) return jsonError('No text', 400);
 

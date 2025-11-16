@@ -55,11 +55,33 @@ export async function POST(req: NextRequest) {
     }
 
     const db = getTursoClient();
-    await db.execute(
-      `INSERT INTO transcribe_jobs (id, subId, status, extraInfo)
-       VALUES (?, ?, 'queued', ?)`,
-      [jobId, me.sub, extraInfo]
-    );
+    let inserted = false;
+    try {
+      await db.execute(
+        `INSERT INTO transcribe_jobs (id, subId, status, extraInfo, updated_at)
+         VALUES (?, ?, 'queued', ?, CURRENT_TIMESTAMP)`,
+        [jobId, me.sub, extraInfo]
+      );
+      inserted = true;
+    } catch (err: any) {
+      const msg = String(err?.message || err || '');
+      if (!msg.includes('UNIQUE constraint failed: transcribe_jobs.id')) {
+        throw err;
+      }
+      console.warn('transcribe_jobs already exists, updating instead', { jobId });
+    }
+
+    if (!inserted) {
+      await db.execute(
+        `UPDATE transcribe_jobs
+            SET subId = ?,
+                extraInfo = ?,
+                status = CASE WHEN status IN ('queued','running') THEN status ELSE 'queued' END,
+                updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?`,
+        [me.sub, extraInfo, jobId]
+      );
+    }
 
     const origin = url.origin;
     const callbackUrl = `${origin}/api/mobileBackend/transcribe/callback?jobId=${encodeURIComponent(jobId)}`;
