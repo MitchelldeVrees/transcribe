@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth, TokenExpiredError, UnauthorizedError } from '@/lib/requireAuth';
 import { getTursoClient } from '@/lib/turso';
 import { syncSubscription, getUsageSnapshot } from '@/lib/billing';
+import { getStripeClient } from '@/lib/stripe';
 
 type SyncSubscriptionRequest = {
   planCode?: string;
@@ -10,6 +11,15 @@ type SyncSubscriptionRequest = {
   currentPeriodEnd?: string | number | null;
   status?: string;
 };
+
+async function getStripeCustomerId(db: ReturnType<typeof getTursoClient>, accountId: string) {
+  const res = await db.execute(
+    `SELECT stripe_customer_id FROM mobile_customers WHERE account_id = ? LIMIT 1`,
+    [accountId]
+  );
+  const existing = (res.rows[0] as any)?.stripe_customer_id;
+  return existing ? String(existing) : undefined;
+}
 
 function normalizePeriodEnd(value: string | number | null | undefined): string | null {
   if (value === null || value === undefined || value === '') return null;
@@ -38,13 +48,21 @@ export async function POST(req: NextRequest) {
     }
 
     const db = getTursoClient();
-    await syncSubscription(db, {
-      accountId: me.sub,
-      planCode,
-      stripeSubscriptionId,
-      currentPeriodEnd: normalizePeriodEnd(body.currentPeriodEnd),
-      status: body.status ?? undefined,
-    });
+    const stripe = getStripeClient();
+    const stripeCustomerId = await getStripeCustomerId(db, me.sub);
+    const verifyOpts = stripeCustomerId ? { stripe, customerId: stripeCustomerId } : undefined;
+
+    await syncSubscription(
+      db,
+      {
+        accountId: me.sub,
+        planCode,
+        stripeSubscriptionId,
+        currentPeriodEnd: normalizePeriodEnd(body.currentPeriodEnd),
+        status: body.status ?? undefined,
+      },
+      verifyOpts
+    );
 
     const usage = await getUsageSnapshot(db, me.sub);
 

@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth, TokenExpiredError, UnauthorizedError } from '@/lib/requireAuth';
 import { getTursoClient } from '@/lib/turso';
 import { syncTopUp, getUsageSnapshot } from '@/lib/billing';
+import { getStripeClient } from '@/lib/stripe';
 
 type SyncTopUpRequest = {
   topUpId?: string;
@@ -10,6 +11,15 @@ type SyncTopUpRequest = {
   stripePaymentIntentId?: string | null;
   minutesGranted?: number;
 };
+
+async function getStripeCustomerId(db: ReturnType<typeof getTursoClient>, accountId: string) {
+  const res = await db.execute(
+    `SELECT stripe_customer_id FROM mobile_customers WHERE account_id = ? LIMIT 1`,
+    [accountId]
+  );
+  const existing = (res.rows[0] as any)?.stripe_customer_id;
+  return existing ? String(existing) : undefined;
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -26,13 +36,20 @@ export async function POST(req: NextRequest) {
     }
 
     const db = getTursoClient();
-    const result = await syncTopUp(db, {
-      accountId: me.sub,
-      topUpId,
-      stripeInvoiceId,
-      stripePaymentIntentId: body.stripePaymentIntentId ?? null,
-      minutesGranted: typeof body.minutesGranted === 'number' ? body.minutesGranted : undefined,
-    });
+    const stripe = getStripeClient();
+    const stripeCustomerId = await getStripeCustomerId(db, me.sub);
+    const verifyOpts = stripeCustomerId ? { stripe, customerId: stripeCustomerId } : undefined;
+    const result = await syncTopUp(
+      db,
+      {
+        accountId: me.sub,
+        topUpId,
+        stripeInvoiceId,
+        stripePaymentIntentId: body.stripePaymentIntentId ?? null,
+        minutesGranted: typeof body.minutesGranted === 'number' ? body.minutesGranted : undefined,
+      },
+      verifyOpts
+    );
 
     const usage = await getUsageSnapshot(db, me.sub);
 

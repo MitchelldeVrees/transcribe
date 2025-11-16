@@ -80,7 +80,7 @@ const DEFAULT_PLAN_DEFINITIONS: PlanDefinition[] = [
     name: 'Starter',
     description: 'Uitgebreide functies voor starters en zelfstandigen.',
     quotaMinutes: 900,
-    stripePriceEnv: 'STRIPE_PRICE_PLAN_STARTER',
+    stripePriceEnv: 'STRIPE_PRICE_PLAN_BASIC_ID',
     amountCents: 1299,
     currency: 'eur',
     retentionOptionId: '30d',
@@ -90,7 +90,7 @@ const DEFAULT_PLAN_DEFINITIONS: PlanDefinition[] = [
     name: 'Pro',
     description: 'Voor professionals die wekelijks meerdere transcripties maken.',
     quotaMinutes: 1800,
-    stripePriceEnv: 'STRIPE_PRICE_PLAN_PRO',
+    stripePriceEnv: 'STRIPE_PRICE_PLAN_STARTER',
     amountCents: 2499,
     currency: 'eur',
     retentionOptionId: '90d',
@@ -285,13 +285,14 @@ async function ensureUsagePeriodRow(db: Client, accountId: string, periodId: str
   );
 }
 
-async function sumTopUpMs(db: Client, accountId: string, periodId: string): Promise<number> {
+async function sumTopUpMs(db: Client, accountId: string): Promise<number> {
   await ensureBillingTables(db);
   const res = await db.execute(
     `SELECT COALESCE(SUM(ms_granted), 0) AS bonus_ms
        FROM mobile_topups
-      WHERE account_id = ? AND credited_period_id = ?`,
-    [accountId, periodId]
+      WHERE account_id = ?
+        AND datetime(created_at) >= datetime('now', '-365 days')`,
+    [accountId]
   );
   const row = res.rows[0] as any;
   return Number(row?.bonus_ms ?? 0);
@@ -312,7 +313,7 @@ export async function getUsageSnapshot(db: Client, accountId: string): Promise<U
   );
   const usedMs = Number((usageRes.rows[0] as any)?.used_ms ?? 0);
 
-  const bonusMs = await sumTopUpMs(db, accountId, period.periodId);
+  const bonusMs = await sumTopUpMs(db, accountId);
   const baseQuotaMs = Number(planRow.monthly_quota_ms ?? 0);
   const totalQuotaMs = baseQuotaMs + bonusMs;
   const remainingMs = Math.max(totalQuotaMs - usedMs, 0);
@@ -339,7 +340,7 @@ export async function getEffectiveQuotaMs(
   baseQuotaMs: number,
   periodId: string
 ): Promise<{ quotaMs: number; bonusMs: number }> {
-  const bonusMs = await sumTopUpMs(db, accountId, periodId);
+  const bonusMs = await sumTopUpMs(db, accountId);
   return { quotaMs: baseQuotaMs + bonusMs, bonusMs };
 }
 
@@ -429,7 +430,8 @@ async function determinePlanQuotaMs(
 
 export async function syncSubscription(
   db: Client,
-  payload: SubscriptionSyncPayload
+  payload: SubscriptionSyncPayload,
+  verify?: { stripe: Stripe; customerId?: string | null }
 ): Promise<void> {
   const { accountId, planCode, stripeSubscriptionId } = payload;
   if (!accountId || !planCode || !stripeSubscriptionId) {
@@ -438,6 +440,25 @@ export async function syncSubscription(
 
   await ensureBillingTables(db);
   await ensureRetentionTables(db);
+
+  if (verify?.stripe) {
+    const sub = await verify.stripe.subscriptions.retrieve(stripeSubscriptionId);
+    if (!sub) {
+      throw new Error('Unable to load subscription from Stripe');
+    }
+    if (sub.customer && verify.customerId && sub.customer !== verify.customerId) {
+      throw new Error('Subscription does not belong to this account');
+    }
+    const allowedStatuses: Stripe.Subscription.Status[] = [
+      'active',
+      'trialing',
+      'past_due',
+      'incomplete',
+    ];
+    if (!allowedStatuses.includes(sub.status)) {
+      throw new Error('Subscription is not active');
+    }
+  }
 
   const currentPlanRow = await fetchAccountPlan(db, accountId);
   const baseQuotaMs = await determinePlanQuotaMs(
@@ -489,7 +510,11 @@ export async function syncSubscription(
 
 export async function syncTopUp(
   db: Client,
-  payload: TopUpSyncPayload
+  payload: TopUpSyncPayload,
+  verify?: {
+    stripe: Stripe;
+    customerId?: string | null;
+  }
 ): Promise<{ created: boolean }> {
   const { accountId, topUpId, stripeInvoiceId } = payload;
   if (!accountId || !topUpId || !stripeInvoiceId) {
@@ -501,6 +526,18 @@ export async function syncTopUp(
   const topUp = findTopUp(topUpId);
   if (!topUp && typeof payload.minutesGranted !== 'number') {
     throw new Error(`Unknown topUpId ${topUpId}`);
+  }
+
+  if (verify?.stripe && payload.stripePaymentIntentId) {
+    const intent = await verify.stripe.paymentIntents.retrieve(
+      payload.stripePaymentIntentId
+    );
+    if (!intent || (intent.customer && verify.customerId && intent.customer !== verify.customerId)) {
+      throw new Error('PaymentIntent does not belong to this account');
+    }
+    if (intent.status !== 'succeeded' && intent.status !== 'requires_capture') {
+      throw new Error('PaymentIntent is not complete');
+    }
   }
 
   const planRow = await fetchAccountPlan(db, accountId);

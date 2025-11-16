@@ -11,7 +11,10 @@ export async function middleware(req: NextRequest) {
   }
 
   // 2) Touch next-auth JWT so it initializes in middleware (optional)
-  await getToken({ req, secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET });
+  const secret = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET;
+  if (secret) {
+    await getToken({ req, secret });
+  }
   return NextResponse.next();
 }
 
