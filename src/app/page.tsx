@@ -107,9 +107,6 @@ export default function Home() {
   const router = useRouter();
   const [pendingSave, setPendingSave] = useState(false);
 
-  // New state: transcription model choice ("assembly" or "openai")
-  // New state: summarization enabled (true/false)
-  const [summarization, setSummarization] = useState<boolean>(false);
 
   // Reference to the audio element
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -575,7 +572,6 @@ export default function Home() {
     setStage("loading");
     setError("");
     setProgress(0);
-    setSummarization(true);
 
     const startTime = performance.now();
     try {
@@ -597,7 +593,7 @@ export default function Home() {
       let qnaItems: QnaItem[] = [];
       let summaryError = "";
 
-      if (summarization && transcriptText.length > 20) {
+      if (transcriptText.length > 20) {
         try {
           const summaryData = await requestSummaries(jobId, extraInfoForJob);
           summaryHtml = summaryData.summary ?? "";
