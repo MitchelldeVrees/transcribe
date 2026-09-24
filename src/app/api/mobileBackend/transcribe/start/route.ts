@@ -83,7 +83,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const origin = url.origin;
+    // The Azure Function runs in the cloud and must reach this callback
+    // publicly, so `url.origin` (e.g. localhost during dev) doesn't work.
+    // Set PUBLIC_CALLBACK_BASE_URL (e.g. a tunnel URL) to override it locally.
+    const origin = process.env.PUBLIC_CALLBACK_BASE_URL || url.origin;
     const callbackUrl = `${origin}/api/mobileBackend/transcribe/callback?jobId=${encodeURIComponent(jobId)}`;
 
     const payload = {

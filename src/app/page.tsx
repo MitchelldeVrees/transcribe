@@ -504,16 +504,23 @@ export default function Home() {
     };
   }
 
-  async function uploadFileToAzure(
-    uploadUrl: string,
-    file: File,
-    mimeType: string
-  ) {
-    const res = await fetch(uploadUrl, {
+  async function uploadFile(file: File) {
+    const { uploadUrl, blobName, mimeType } = await requestUploadSlot(file);
+
+    // Proxied through our own backend (same-origin) so the browser never
+    // makes a cross-origin PUT to Azure directly — Azure Blob Storage does
+    // not allow that from the browser (CORS), which surfaced as
+    // "Failed to fetch". The proxy streams the body through without
+    // buffering, so large files don't blow up server memory.
+    const proxyUrl = `/api/mobileBackend/uploads/proxy?target=${encodeURIComponent(
+      uploadUrl
+    )}`;
+
+    const res = await fetch(proxyUrl, {
       method: "PUT",
       headers: {
-        "x-ms-blob-type": "BlockBlob",
         "Content-Type": mimeType,
+        ...(getAuthHeaders() || {}),
       },
       body: file,
     });
@@ -522,6 +529,8 @@ export default function Home() {
       const text = await res.text().catch(() => "");
       throw new Error(text || "Uploaden naar Azure is mislukt.");
     }
+
+    return { blobName, mimeType };
   }
 
   async function startTranscriptionJob(
@@ -577,10 +586,7 @@ export default function Home() {
     const startTime = performance.now();
     try {
       setProgress(5);
-      const { uploadUrl, blobName, mimeType } = await requestUploadSlot(file);
-      setProgress(15);
-
-      await uploadFileToAzure(uploadUrl, file, mimeType);
+      const { blobName, mimeType } = await uploadFile(file);
       setProgress(40);
 
       const jobId = generateJobId();
