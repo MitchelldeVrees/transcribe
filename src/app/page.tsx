@@ -507,20 +507,14 @@ export default function Home() {
   async function uploadFile(file: File) {
     const { uploadUrl, blobName, mimeType } = await requestUploadSlot(file);
 
-    // Proxied through our own backend (same-origin) so the browser never
-    // makes a cross-origin PUT to Azure directly — Azure Blob Storage does
-    // not allow that from the browser (CORS), which surfaced as
-    // "Failed to fetch". The proxy streams the body through without
-    // buffering, so large files don't blow up server memory.
-    const proxyUrl = `/api/mobileBackend/uploads/proxy?target=${encodeURIComponent(
-      uploadUrl
-    )}`;
-
-    const res = await fetch(proxyUrl, {
+    // Uploads directly from the browser to Azure using the presigned SAS
+    // URL. Requires CORS to be configured on the Azure Storage Account to
+    // allow PUT from this app's origins.
+    const res = await fetch(uploadUrl, {
       method: "PUT",
       headers: {
+        "x-ms-blob-type": "BlockBlob",
         "Content-Type": mimeType,
-        ...(getAuthHeaders() || {}),
       },
       body: file,
     });
