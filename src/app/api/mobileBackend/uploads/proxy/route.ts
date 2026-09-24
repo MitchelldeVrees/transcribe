@@ -40,20 +40,35 @@ export async function PUT(req: NextRequest) {
   }
 
   const contentType = req.headers.get('content-type') || 'application/octet-stream';
-  const contentLength = req.headers.get('content-length');
+  const contentLengthHeader = req.headers.get('content-length');
+  const contentLength = contentLengthHeader ? Number(contentLengthHeader) : NaN;
+
+  if (!req.body || !Number.isFinite(contentLength) || contentLength <= 0) {
+    return error('Content-Length header is vereist.', 411);
+  }
 
   const headers = new Headers({
     'x-ms-blob-type': 'BlockBlob',
     'Content-Type': contentType,
+    'Content-Length': String(contentLength),
   });
-  if (contentLength) {
-    headers.set('Content-Length', contentLength);
+
+  // Azure's "Put Blob" rejects chunked transfer-encoding and requires a real
+  // Content-Length. Cloudflare Workers' fetch sends a streamed body as
+  // chunked and drops any Content-Length header you set yourself, so we pipe
+  // through FixedLengthStream to force a fixed-length (non-chunked) request.
+  const FixedLengthStreamCtor = (globalThis as any).FixedLengthStream;
+  let outboundBody: ReadableStream | ReadableStream<Uint8Array> = req.body;
+  if (FixedLengthStreamCtor) {
+    const { readable, writable } = new FixedLengthStreamCtor(contentLength);
+    req.body.pipeTo(writable);
+    outboundBody = readable;
   }
 
   const azureRes = await fetch(uploadUrl.toString(), {
     method: 'PUT',
     headers,
-    body: req.body,
+    body: outboundBody,
     // Required so Node's fetch does not buffer the whole stream.
     // @ts-expect-error - duplex is still experimental in types.
     duplex: 'half',
